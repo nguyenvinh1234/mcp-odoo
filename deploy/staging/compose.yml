@@ -82,7 +82,7 @@ services:
       - ./oauth_stub.py:/opt/oauth/oauth_stub.py:ro
     networks: [backend]
     read_only: true
-    tmpfs: [/tmp:size=16m,mode=1777]
+    tmpfs: ["/tmp:size=16m,mode=1777"]
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
     mem_limit: 128m
@@ -128,7 +128,7 @@ services:
       odoo16: {condition: service_healthy}
       oauth-stub: {condition: service_healthy}
     read_only: true
-    tmpfs: [/tmp:size=64m,mode=1777]
+    tmpfs: ["/tmp:size=64m,mode=1777"]
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
     mem_limit: 512m
@@ -153,7 +153,7 @@ services:
     depends_on:
       gateway: {condition: service_healthy}
     read_only: true
-    tmpfs: [/tmp:size=16m,mode=1777]
+    tmpfs: ["/tmp:size=16m,mode=1777"]
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
     mem_limit: 256m
