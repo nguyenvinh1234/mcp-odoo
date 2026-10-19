@@ -118,7 +118,7 @@ services:
       ODOO_MCP_AUTH_REQUIRE_AUD: "1"
       ODOO_MCP_AUTH_REQUIRE_ISS: "1"
       ODOO_MCP_AUTH_CACHE_TTL: "15"
-      MCP_ALLOWED_HOSTS: ${MCP_PUBLIC_HOST},127.0.0.1:*,localhost:*
+      MCP_ALLOWED_HOSTS: ${MCP_PUBLIC_HOST},127.0.0.1:*,localhost:*,gateway:8000
       MCP_ALLOWED_ORIGINS: https://${MCP_PUBLIC_HOST}
     secrets: [odoo_config, client_policy, oauth_client_secret]
     volumes: [gateway-audit:/var/log/odoo-mcp]
