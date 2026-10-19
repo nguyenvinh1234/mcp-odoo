@@ -23,6 +23,7 @@ services:
 
   odoo16-init:
     image: odoo:16.0
+    profiles: ["init"]
     restart: "no"
     command: ["odoo", "-d", "ngv_mcp_staging", "-i", "ngv_mcp_staging", "--without-demo=True", "--stop-after-init"]
     environment:
@@ -57,7 +58,6 @@ services:
     networks: [backend]
     depends_on:
       db: {condition: service_healthy}
-      odoo16-init: {condition: service_completed_successfully}
     healthcheck:
       test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8069/web/login', timeout=5)"]
       interval: 15s

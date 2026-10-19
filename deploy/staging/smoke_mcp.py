@@ -11,7 +11,7 @@ from typing import Any
 
 import httpx2
 from mcp import ClientSession
-from mcp.client.streamable_http import streamablehttp_client
+from mcp.client.streamable_http import streamable_http_client
 
 
 URL = os.environ.get("MCP_TEST_URL", "http://gateway:8000/mcp")
@@ -41,7 +41,7 @@ def _structured(result: Any) -> dict[str, Any]:
 
 async def _session(token: str, calls: list[tuple[str, dict[str, Any]]]):
     headers = {"Authorization": f"Bearer {token}"}
-    async with streamablehttp_client(URL, headers=headers) as streams:
+    async with streamable_http_client(URL, headers=headers) as streams:
         read_stream, write_stream = streams[0], streams[1]
         async with ClientSession(read_stream, write_stream) as session:
             await session.initialize()

@@ -60,8 +60,15 @@ nay” là lead active có `create_date` nằm trong ngày lịch tại
 ```bash
 docker compose --env-file deploy/staging/.env \
   -f deploy/staging/compose.yml config --quiet
+python3 deploy/staging/prepare_secrets.py
 docker compose --env-file deploy/staging/.env \
-  -f deploy/staging/compose.yml up -d --build
+  -f deploy/staging/compose.yml up -d db
+docker compose --env-file deploy/staging/.env \
+  -f deploy/staging/compose.yml run --rm odoo16-init
+docker compose --env-file deploy/staging/.env \
+  -f deploy/staging/compose.yml up -d --build odoo16 oauth-stub gateway
+docker compose --profile test --env-file deploy/staging/.env \
+  -f deploy/staging/compose.yml run --rm smoke
 ```
 
 Compose chỉ publish gateway lên `127.0.0.1`; Odoo và PostgreSQL không publish
