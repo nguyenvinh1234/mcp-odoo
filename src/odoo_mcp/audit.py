@@ -79,3 +79,44 @@ def record_write_event(
     except OSError as exc:
         logger.warning("audit log write failed (%s): %s", path, exc)
         return False
+
+
+def record_gateway_event(
+    event: str,
+    *,
+    outcome: str,
+    client_id: str | None,
+    tool: str,
+    request_id: str | None = None,
+    instance: str | None = None,
+    record_ids: list[int] | None = None,
+    result_count: int | None = None,
+    duration_ms: int | None = None,
+    error_code: str | None = None,
+) -> bool:
+    """Append redacted query metadata without arguments or business payloads."""
+    path = audit_log_path()
+    if path is None:
+        return False
+    entry = {
+        "ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "event": event,
+        "outcome": outcome,
+        "client_id": client_id,
+        "tool": tool,
+        "request_id": request_id,
+        "instance": instance,
+        "record_ids": [int(value) for value in (record_ids or [])[:200]],
+        "result_count": result_count,
+        "duration_ms": duration_ms,
+        "error_code": error_code,
+    }
+    try:
+        line = json.dumps(entry, sort_keys=True, default=str)
+        with _write_lock:
+            with open(path, "a", encoding="utf-8") as handle:
+                handle.write(line + "\n")
+        return True
+    except OSError as exc:
+        logger.warning("audit log write failed (%s): %s", path, exc)
+        return False

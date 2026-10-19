@@ -113,6 +113,23 @@ def test_build_auth_rejects_partial_configuration(monkeypatch):
         auth.build_auth()
 
 
+def test_auth_secret_can_be_loaded_from_file(monkeypatch, tmp_path):
+    secret_file = tmp_path / "oauth-secret"
+    secret_file.write_text("file-secret\n", encoding="utf-8")
+    monkeypatch.delenv("ODOO_MCP_AUTH_CLIENT_SECRET", raising=False)
+    monkeypatch.setenv("ODOO_MCP_AUTH_CLIENT_SECRET_FILE", str(secret_file))
+    assert auth._env("CLIENT_SECRET") == "file-secret"
+
+
+def test_auth_value_and_file_together_are_rejected(monkeypatch, tmp_path):
+    secret_file = tmp_path / "oauth-secret"
+    secret_file.write_text("file-secret", encoding="utf-8")
+    monkeypatch.setenv("ODOO_MCP_AUTH_CLIENT_SECRET", "inline-secret")
+    monkeypatch.setenv("ODOO_MCP_AUTH_CLIENT_SECRET_FILE", str(secret_file))
+    with pytest.raises(ValueError, match="only one"):
+        auth._env("CLIENT_SECRET")
+
+
 def test_build_auth_builds_settings_and_verifier(monkeypatch):
     monkeypatch.setenv("ODOO_MCP_AUTH_ISSUER_URL", "https://as.example.com")
     monkeypatch.setenv("ODOO_MCP_AUTH_INTROSPECTION_URL", INTROSPECTION)

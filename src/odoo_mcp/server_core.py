@@ -39,6 +39,7 @@ from .write_policy import (
 from .audit import audit_posture
 from .auth import auth_posture as oauth_posture
 from .field_policy import field_policy_posture, get_field_policy
+from .ngv_policy import NGV_TOOLS, ngv_posture, ngv_profile_enabled, validate_ngv_startup
 
 
 def _srv() -> Any:
@@ -92,6 +93,7 @@ async def app_lifespan(server: MCPServer) -> AsyncIterator[AppContext]:
     # Validate the field ACL policy at startup so a malformed policy fails
     # closed (aborts) instead of silently running unprotected at first read.
     get_field_policy()
+    validate_ngv_startup()
     yield AppContext()
 
 
@@ -547,6 +549,7 @@ def runtime_security_report() -> Dict[str, Any]:
         "audit_log": audit_posture(),
         "oauth": oauth_posture(),
         "field_acl": field_policy_posture(),
+        "ngocviet_gateway": ngv_posture(),
         "n_plus_one": n_plus_one_report(),
         "notes": [
             "HTTP transports are local-only by default in the CLI entry point.",
@@ -732,28 +735,43 @@ def apply_tool_filter() -> None:
     """
     from fnmatch import fnmatch
 
-    include = [
-        p.strip()
-        for p in os.environ.get("ODOO_MCP_TOOLS_INCLUDE", "").split(",")
-        if p.strip()
-    ]
-    exclude = [
-        p.strip()
-        for p in os.environ.get("ODOO_MCP_TOOLS_EXCLUDE", "").split(",")
-        if p.strip()
-    ]
+    if ngv_profile_enabled():
+        include = sorted(NGV_TOOLS)
+        exclude: list[str] = []
+        # Generic resources accept arbitrary model names/record IDs and would
+        # bypass the fixed business-tool allowlist. Prompts are not needed by
+        # this gateway profile, so remove both surfaces as a fail-closed rule.
+        resource_manager = getattr(mcp, "_resource_manager", None)
+        for attribute in ("_resources", "_templates"):
+            registry = getattr(resource_manager, attribute, None)
+            if isinstance(registry, dict):
+                registry.clear()
+        prompt_registry = getattr(getattr(mcp, "_prompt_manager", None), "_prompts", None)
+        if isinstance(prompt_registry, dict):
+            prompt_registry.clear()
+    else:
+        include = [
+            p.strip()
+            for p in os.environ.get("ODOO_MCP_TOOLS_INCLUDE", "").split(",")
+            if p.strip()
+        ]
+        exclude = [
+            p.strip()
+            for p in os.environ.get("ODOO_MCP_TOOLS_EXCLUDE", "").split(",")
+            if p.strip()
+        ]
     PLUGIN_STATE["tools_filtered"] = []
     if not include and not exclude:
         return
-    registry = getattr(mcp._tool_manager, "_tools", None)
-    if not isinstance(registry, dict):  # unexpected SDK shape — do nothing
+    tool_registry = getattr(mcp._tool_manager, "_tools", None)
+    if not isinstance(tool_registry, dict):  # unexpected SDK shape — do nothing
         return
     removed = []
-    for name in list(registry):
+    for name in list(tool_registry):
         keep = (not include or any(fnmatch(name, pat) for pat in include)) and (
             not any(fnmatch(name, pat) for pat in exclude)
         )
         if not keep:
-            del registry[name]
+            del tool_registry[name]
             removed.append(name)
     PLUGIN_STATE["tools_filtered"] = sorted(removed)

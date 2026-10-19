@@ -1,0 +1,112 @@
+name: ${COMPOSE_PROJECT_NAME:-ngv-odoo-mcp-staging}
+
+services:
+  db:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: odoo
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets: [postgres_password]
+    volumes: [odoo16-db:/var/lib/postgresql/data]
+    networks: [backend]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U odoo -d postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    security_opt: ["no-new-privileges:true"]
+
+  odoo16-init:
+    image: odoo:16.0
+    restart: "no"
+    command: ["odoo", "-d", "ngv_mcp_staging", "-i", "base,crm,sale_management", "--without-demo=False", "--stop-after-init"]
+    environment:
+      HOST: db
+      PORT: 5432
+      USER: odoo
+      PASSWORD_FILE: /run/secrets/postgres_password
+    secrets: [postgres_password]
+    volumes: [odoo16-data:/var/lib/odoo]
+    networks: [backend]
+    depends_on:
+      db: {condition: service_healthy}
+    security_opt: ["no-new-privileges:true"]
+
+  odoo16:
+    image: odoo:16.0
+    restart: unless-stopped
+    environment:
+      HOST: db
+      PORT: 5432
+      USER: odoo
+      PASSWORD_FILE: /run/secrets/postgres_password
+    secrets: [postgres_password]
+    volumes: [odoo16-data:/var/lib/odoo]
+    networks: [backend]
+    depends_on:
+      db: {condition: service_healthy}
+      odoo16-init: {condition: service_completed_successfully}
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8069/web/login', timeout=5)"]
+      interval: 15s
+      timeout: 8s
+      retries: 20
+    security_opt: ["no-new-privileges:true"]
+
+  gateway:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    command: ["--transport", "streamable-http", "--host", "0.0.0.0", "--port", "8000", "--path", "/mcp", "--allow-remote-http"]
+    environment:
+      ODOO_CONFIG_FILE: /run/secrets/odoo_config
+      ODOO_MCP_SECURITY_PROFILE: ngocviet-readonly
+      ODOO_MCP_NGV_CLIENT_POLICY_FILE: /run/secrets/client_policy
+      ODOO_MCP_AUDIT_LOG: /var/log/odoo-mcp/audit.jsonl
+      ODOO_MCP_LOG_JSON: "1"
+      ODOO_MCP_LOG_LEVEL: INFO
+      ODOO_MCP_AUTH_ISSUER_URL: ${MCP_AUTH_ISSUER_URL}
+      ODOO_MCP_AUTH_INTROSPECTION_URL: ${MCP_AUTH_INTROSPECTION_URL}
+      ODOO_MCP_AUTH_RESOURCE_URL: ${MCP_RESOURCE_URL}
+      ODOO_MCP_AUTH_CLIENT_ID: ngv-odoo-mcp-staging
+      ODOO_MCP_AUTH_CLIENT_SECRET_FILE: /run/secrets/oauth_client_secret
+      ODOO_MCP_AUTH_REQUIRED_SCOPES: odoo.read
+      ODOO_MCP_AUTH_IDENTITY_CLAIM: sub
+      ODOO_MCP_AUTH_REQUIRE_AUD: "1"
+      ODOO_MCP_AUTH_REQUIRE_ISS: "1"
+      ODOO_MCP_AUTH_CACHE_TTL: "15"
+      MCP_ALLOWED_HOSTS: ${MCP_PUBLIC_HOST},127.0.0.1:*,localhost:*
+      MCP_ALLOWED_ORIGINS: https://${MCP_PUBLIC_HOST}
+    secrets: [odoo_config, client_policy, oauth_client_secret]
+    volumes: [gateway-audit:/var/log/odoo-mcp]
+    ports: ["127.0.0.1:${MCP_BIND_PORT:-8765}:8000"]
+    networks: [backend, edge]
+    depends_on:
+      odoo16: {condition: service_healthy}
+    read_only: true
+    tmpfs: [/tmp:size=64m,mode=1777]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; s=socket.create_connection(('127.0.0.1',8000),5); s.close()"]
+      interval: 15s
+      timeout: 8s
+      retries: 12
+
+networks:
+  backend: {internal: true}
+  edge: {}
+
+volumes:
+  odoo16-db: {}
+  odoo16-data: {}
+  gateway-audit: {}
+
+secrets:
+  postgres_password: {file: ./secrets/postgres_password.txt}
+  odoo_config: {file: ./secrets/odoo_config.json}
+  client_policy: {file: ./secrets/client_policy.json}
+  oauth_client_secret: {file: ./secrets/oauth_client_secret.txt}

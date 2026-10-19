@@ -34,6 +34,8 @@ logs/
 
 # Odoo specific
 odoo_config.json
+deploy/staging/secrets/*
+!deploy/staging/secrets/*.example
 
 # System files
 .DS_Store

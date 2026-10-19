@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Added the opt-in `ngocviet-readonly` security profile with per-client OAuth
+  subject mapping, fixed CRM/customer/quotation/product tools, redacted query
+  audit events, and explicit Odoo 16 XML-RPC / Odoo 20 JSON-2 adapters.
+- Added an isolated staging Compose stack, Vietnamese operations guide,
+  security review, business-function matrix, and acceptance-test report.
+
+### Security
+
+- The Ngoc Viet profile removes generic tools, resources, templates, and
+  prompts; rejects write, unknown-method, and direct-chatter escape hatches;
+  and requires OAuth for every HTTP transport.
+- Docker now runs the gateway as UID/GID 10001 instead of root. OAuth client
+  secrets may be loaded from a mounted `*_FILE` secret.
+- Refreshed the lockfile to patched runtime dependencies; `pip-audit` reported
+  no known vulnerabilities on 2026-10-19.
+
 ## [1.3.2] - 2026-08-19
 
 ### Changed

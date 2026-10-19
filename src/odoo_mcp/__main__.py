@@ -13,7 +13,8 @@ import traceback
 
 from mcp.server.transport_security import TransportSecuritySettings
 
-from .auth import build_auth
+from .auth import auth_configured, build_auth
+from .ngv_policy import ngv_profile_enabled
 from .server import mcp
 
 SUPPORTED_MCP_TRANSPORTS = {"stdio", "streamable-http", "sse"}
@@ -223,6 +224,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 def configure_mcp_runtime(args: argparse.Namespace) -> dict[str, object]:
     """Build MCPServer v2 run options from CLI/env settings."""
+    if args.transport in {"streamable-http", "sse"} and ngv_profile_enabled():
+        if not auth_configured():
+            raise ValueError(
+                "Ngoc Viet HTTP gateway requires complete ODOO_MCP_AUTH_* OAuth configuration."
+            )
     if (
         args.transport in {"streamable-http", "sse"}
         and args.host not in LOCAL_HTTP_HOSTS
