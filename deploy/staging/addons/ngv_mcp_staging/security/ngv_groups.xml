@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <record id="group_mcp_crm_readonly" model="res.groups">
+    <field name="name">MCP staging CRM read only</field>
+    <field name="category_id" ref="base.module_category_hidden"/>
+  </record>
+  <record id="group_mcp_full_readonly" model="res.groups">
+    <field name="name">MCP staging CRM and sales read only</field>
+    <field name="category_id" ref="base.module_category_hidden"/>
+    <field name="implied_ids" eval="[(4, ref('ngv_mcp_staging.group_mcp_crm_readonly'))]"/>
+  </record>
+</odoo>

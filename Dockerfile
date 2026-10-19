@@ -20,8 +20,8 @@ RUN pip install --no-cache-dir .
 # The gateway never needs root or a shell-writable application tree at runtime.
 RUN groupadd --gid 10001 odoo-mcp \
     && useradd --uid 10001 --gid 10001 --no-create-home --shell /usr/sbin/nologin odoo-mcp \
-    && mkdir -p /app/logs \
-    && chown -R 10001:10001 /app/logs
+    && mkdir -p /app/logs /var/log/odoo-mcp \
+    && chown -R 10001:10001 /app/logs /var/log/odoo-mcp
 
 # Runtime Odoo connection values should be supplied via `docker run -e ...`.
 # Do not bake credential placeholders into the image; Docker flags password ENV

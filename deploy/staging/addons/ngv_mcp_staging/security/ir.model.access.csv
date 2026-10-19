@@ -1,0 +1,11 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_mcp_crm_lead,access.mcp.crm.lead,crm.model_crm_lead,ngv_mcp_staging.group_mcp_crm_readonly,1,0,0,0
+access_mcp_res_partner,access.mcp.res.partner,base.model_res_partner,ngv_mcp_staging.group_mcp_crm_readonly,1,0,0,0
+access_mcp_res_users,access.mcp.res.users,base.model_res_users,ngv_mcp_staging.group_mcp_crm_readonly,1,0,0,0
+access_mcp_res_company,access.mcp.res.company,base.model_res_company,ngv_mcp_staging.group_mcp_crm_readonly,1,0,0,0
+access_mcp_res_country,access.mcp.res.country,base.model_res_country,ngv_mcp_staging.group_mcp_crm_readonly,1,0,0,0
+access_mcp_crm_team,access.mcp.crm.team,sales_team.model_crm_team,ngv_mcp_staging.group_mcp_crm_readonly,1,0,0,0
+access_mcp_crm_stage,access.mcp.crm.stage,crm.model_crm_stage,ngv_mcp_staging.group_mcp_crm_readonly,1,0,0,0
+access_mcp_sale_order,access.mcp.sale.order,sale.model_sale_order,ngv_mcp_staging.group_mcp_full_readonly,1,0,0,0
+access_mcp_product_template,access.mcp.product.template,product.model_product_template,ngv_mcp_staging.group_mcp_full_readonly,1,0,0,0
+access_mcp_res_currency,access.mcp.res.currency,base.model_res_currency,ngv_mcp_staging.group_mcp_full_readonly,1,0,0,0

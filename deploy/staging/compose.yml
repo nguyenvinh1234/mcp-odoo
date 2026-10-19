@@ -17,22 +17,30 @@ services:
       timeout: 5s
       retries: 12
     security_opt: ["no-new-privileges:true"]
+    mem_limit: 768m
+    pids_limit: 160
+    cpus: 1.0
 
   odoo16-init:
     image: odoo:16.0
     restart: "no"
-    command: ["odoo", "-d", "ngv_mcp_staging", "-i", "base,crm,sale_management", "--without-demo=False", "--stop-after-init"]
+    command: ["odoo", "-d", "ngv_mcp_staging", "-i", "ngv_mcp_staging", "--without-demo=True", "--stop-after-init"]
     environment:
       HOST: db
       PORT: 5432
       USER: odoo
       PASSWORD_FILE: /run/secrets/postgres_password
-    secrets: [postgres_password]
-    volumes: [odoo16-data:/var/lib/odoo]
+    secrets: [postgres_password, odoo_full_password, odoo_crm_password]
+    volumes:
+      - odoo16-data:/var/lib/odoo
+      - ./addons:/mnt/extra-addons:ro
     networks: [backend]
     depends_on:
       db: {condition: service_healthy}
     security_opt: ["no-new-privileges:true"]
+    mem_limit: 1536m
+    pids_limit: 256
+    cpus: 1.5
 
   odoo16:
     image: odoo:16.0
@@ -43,7 +51,9 @@ services:
       USER: odoo
       PASSWORD_FILE: /run/secrets/postgres_password
     secrets: [postgres_password]
-    volumes: [odoo16-data:/var/lib/odoo]
+    volumes:
+      - odoo16-data:/var/lib/odoo
+      - ./addons:/mnt/extra-addons:ro
     networks: [backend]
     depends_on:
       db: {condition: service_healthy}
@@ -54,8 +64,38 @@ services:
       timeout: 8s
       retries: 20
     security_opt: ["no-new-privileges:true"]
+    mem_limit: 1536m
+    pids_limit: 256
+    cpus: 1.5
+
+  oauth-stub:
+    image: python:3.10-slim
+    user: "65534:65534"
+    restart: unless-stopped
+    command: ["python", "/opt/oauth/oauth_stub.py"]
+    environment:
+      OAUTH_ISSUER_URL: ${MCP_AUTH_ISSUER_URL}
+      OAUTH_RESOURCE_URL: ${MCP_RESOURCE_URL}
+      OAUTH_CLIENT_ID: ngv-odoo-mcp-staging
+    secrets: [oauth_client_secret, oauth_full_token, oauth_crm_token]
+    volumes:
+      - ./oauth_stub.py:/opt/oauth/oauth_stub.py:ro
+    networks: [backend]
+    read_only: true
+    tmpfs: [/tmp:size=16m,mode=1777]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 128m
+    pids_limit: 64
+    cpus: 0.25
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
 
   gateway:
+    image: ngv-odoo-mcp-staging:local
     build:
       context: ../..
       dockerfile: Dockerfile
@@ -86,15 +126,40 @@ services:
     networks: [backend, edge]
     depends_on:
       odoo16: {condition: service_healthy}
+      oauth-stub: {condition: service_healthy}
     read_only: true
     tmpfs: [/tmp:size=64m,mode=1777]
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
+    mem_limit: 512m
+    pids_limit: 128
+    cpus: 0.75
     healthcheck:
       test: ["CMD", "python", "-c", "import socket; s=socket.create_connection(('127.0.0.1',8000),5); s.close()"]
       interval: 15s
       timeout: 8s
       retries: 12
+
+  smoke:
+    image: ngv-odoo-mcp-staging:local
+    profiles: ["test"]
+    entrypoint: ["python"]
+    command: ["/app/deploy/staging/smoke_mcp.py"]
+    environment:
+      MCP_TEST_URL: http://gateway:8000/mcp
+    secrets: [oauth_full_token, oauth_crm_token, odoo_config]
+    volumes: [gateway-audit:/var/log/odoo-mcp:ro]
+    networks: [backend]
+    depends_on:
+      gateway: {condition: service_healthy}
+    read_only: true
+    tmpfs: [/tmp:size=16m,mode=1777]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 256m
+    pids_limit: 64
+    cpus: 0.5
+    restart: "no"
 
 networks:
   backend: {internal: true}
@@ -110,3 +175,7 @@ secrets:
   odoo_config: {file: ./secrets/odoo_config.json}
   client_policy: {file: ./secrets/client_policy.json}
   oauth_client_secret: {file: ./secrets/oauth_client_secret.txt}
+  oauth_full_token: {file: ./secrets/oauth_full_token.txt}
+  oauth_crm_token: {file: ./secrets/oauth_crm_token.txt}
+  odoo_full_password: {file: ./secrets/odoo_full_password.txt}
+  odoo_crm_password: {file: ./secrets/odoo_crm_password.txt}
