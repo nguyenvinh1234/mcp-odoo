@@ -96,6 +96,16 @@ def _request_identity() -> tuple[str, frozenset[str], bool]:
     return client_id, frozenset(), False
 
 
+def current_request_client_id() -> str | None:
+    """Return the authenticated subject for audit without authorizing a tool."""
+    token = get_access_token()
+    if token is not None:
+        return token.client_id
+    if _truthy(ALLOW_STDIO_ENV):
+        return os.environ.get(STDIO_CLIENT_ID_ENV, "").strip() or None
+    return None
+
+
 def authorize_ngv_tool(tool_name: str) -> ClientDecision:
     if not ngv_profile_enabled():
         raise PermissionError("Ngoc Viet read-only security profile is not enabled")

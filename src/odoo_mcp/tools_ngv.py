@@ -11,7 +11,7 @@ from mcp.server.mcpserver import Context
 
 from .audit import record_gateway_event
 from .ngv_adapters import ReadOnlyOdooAdapter, build_read_only_adapter
-from .ngv_policy import ClientDecision, authorize_ngv_tool
+from .ngv_policy import ClientDecision, authorize_ngv_tool, current_request_client_id
 from .server_core import READ_ONLY_TOOL, _resolve_odoo, mcp
 
 
@@ -135,7 +135,9 @@ def _execute(
         record_gateway_event(
             "ngv_query",
             outcome="denied",
-            client_id=decision.client_id if decision else None,
+            client_id=(
+                decision.client_id if decision else current_request_client_id()
+            ),
             tool=tool,
             request_id=_request_id(ctx),
             instance=decision.instance if decision else None,

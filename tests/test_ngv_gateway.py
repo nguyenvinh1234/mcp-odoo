@@ -203,6 +203,8 @@ def test_lead_tool_denial_never_reaches_odoo(monkeypatch, tmp_path):
     assert result["error"] == tools_ngv.ACCESS_DENIED_MESSAGE
     assert "Bearer token" not in json.dumps(result)
     assert client.calls == []
+    audit_text = (tmp_path / "audit.jsonl").read_text(encoding="utf-8")
+    assert '"client_id": "agent-1"' in audit_text
 
 
 def test_query_failure_never_exposes_internal_exception(monkeypatch, tmp_path):

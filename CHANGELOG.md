@@ -11,6 +11,8 @@ All notable changes to this project will be documented in this file.
   audit events, and explicit Odoo 16 XML-RPC / Odoo 20 JSON-2 adapters.
 - Added an isolated staging Compose stack, Vietnamese operations guide,
   security review, business-function matrix, and acceptance-test report.
+- Added a resource-limited Odoo 16 staging fixture, two read-only ACL identities,
+  a private RFC 7662 test introspection service, and an automated MCP E2E smoke test.
 
 ### Security
 
@@ -21,6 +23,8 @@ All notable changes to this project will be documented in this file.
   secrets may be loaded from a mounted `*_FILE` secret.
 - Read-only business tools now return bounded error envelopes instead of raw
   exception messages that could expose internal connection details.
+- Denied query audit events retain the authenticated subject without exposing
+  bearer tokens or exception details.
 - Refreshed the lockfile to patched runtime dependencies; `pip-audit` reported
   no known vulnerabilities on 2026-10-19.
 

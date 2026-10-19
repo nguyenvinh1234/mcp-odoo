@@ -103,6 +103,12 @@ def _odoo_acl_checks() -> dict[str, Any]:
 
 
 async def main() -> None:
+    audit_path = Path("/var/log/odoo-mcp/audit.jsonl")
+    audit_before = (
+        len(audit_path.read_text(encoding="utf-8").splitlines())
+        if audit_path.exists()
+        else 0
+    )
     async with httpx2.AsyncClient(timeout=10) as client:
         unauthenticated = await client.get(URL, headers={"Accept": "text/event-stream"})
     assert unauthenticated.status_code == 401
@@ -135,10 +141,14 @@ async def main() -> None:
     assert summary["queried_at"] and summary["leads_today"]["record_ids"]
     assert summary["unprocessed_quotations"]["record_ids"]
 
-    audit_path = Path("/var/log/odoo-mcp/audit.jsonl")
-    audit_rows = [json.loads(line) for line in audit_path.read_text().splitlines()]
+    audit_lines = audit_path.read_text(encoding="utf-8").splitlines()
+    audit_rows = [json.loads(line) for line in audit_lines[audit_before:]]
     assert any(row.get("outcome") == "success" for row in audit_rows)
-    assert any(row.get("outcome") == "denied" for row in audit_rows)
+    assert any(
+        row.get("outcome") == "denied"
+        and row.get("client_id") == "staging-crm-ai"
+        for row in audit_rows
+    )
     audit_text = audit_path.read_text(encoding="utf-8")
     assert _secret("oauth_full_token") not in audit_text
     assert _secret("oauth_crm_token") not in audit_text
