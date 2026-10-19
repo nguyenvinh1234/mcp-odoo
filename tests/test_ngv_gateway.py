@@ -200,4 +200,24 @@ def test_lead_tool_denial_never_reaches_odoo(monkeypatch, tmp_path):
     result = tools_ngv.ngv_list_leads(FakeCtx(client))
     assert result["success"] is False
     assert result["error_code"] == "access_denied"
+    assert result["error"] == tools_ngv.ACCESS_DENIED_MESSAGE
+    assert "Bearer token" not in json.dumps(result)
     assert client.calls == []
+
+
+def test_query_failure_never_exposes_internal_exception(monkeypatch, tmp_path):
+    _enable(monkeypatch, tmp_path)
+    client = FakeClient()
+    internal_detail = "postgresql://internal-user:secret@db/production"
+
+    def fail_server_version():
+        raise RuntimeError(internal_detail)
+
+    client.get_server_version = fail_server_version
+    result = tools_ngv.ngv_list_leads(FakeCtx(client))
+
+    assert result["success"] is False
+    assert result["error_code"] == "query_failed"
+    assert result["error"] == tools_ngv.QUERY_FAILED_MESSAGE
+    assert internal_detail not in json.dumps(result)
+    assert internal_detail not in (tmp_path / "audit.jsonl").read_text(encoding="utf-8")

@@ -19,6 +19,8 @@ All notable changes to this project will be documented in this file.
   and requires OAuth for every HTTP transport.
 - Docker now runs the gateway as UID/GID 10001 instead of root. OAuth client
   secrets may be loaded from a mounted `*_FILE` secret.
+- Read-only business tools now return bounded error envelopes instead of raw
+  exception messages that could expose internal connection details.
 - Refreshed the lockfile to patched runtime dependencies; `pip-audit` reported
   no known vulnerabilities on 2026-10-19.
 

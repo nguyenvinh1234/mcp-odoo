@@ -36,6 +36,11 @@ vấn nghiệp vụ. Adapter chỉ gọi `search_read`, `search_count`, `read_gr
 method, field và domain shape được mã cố định. Odoo vẫn thực thi ACL và record
 rules của credential tương ứng.
 
+Phản hồi lỗi của sáu tool nghiệp vụ dùng thông báo cố định và `error_code` thay
+vì trả nguyên exception. Audit chỉ lưu metadata/error code; kiểm thử hồi quy dùng
+chuỗi kết nối giả xác nhận chi tiết nội bộ không xuất hiện trong phản hồi hoặc
+audit log.
+
 ## Giới hạn và việc chưa xác minh
 
 - Chưa có credential/đường kết nối staging Odoo Ngọc Việt trong lượt này; chưa

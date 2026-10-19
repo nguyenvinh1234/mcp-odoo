@@ -4,7 +4,7 @@
 
 | Hạng mục | Kết quả | Bằng chứng |
 |---|---|---|
-| Unit/regression | PASS | `941 passed`, 1 cảnh báo `runpy` không làm fail |
+| Unit/regression | PASS | `942 passed`, 1 cảnh báo `runpy` không làm fail |
 | Ruff | PASS | `All checks passed` với Ruff 0.15.22 |
 | mypy | PASS | 37 source files, không có issue |
 | Compose parse | PASS | `docker compose ... config --quiet`, exit 0 |
@@ -30,6 +30,8 @@ Starlette 1.9.0 và urllib3 2.8.0.
 - Adapter 16 từ chối transport không phải XML-RPC; adapter 20 yêu cầu JSON-2.
 - Bài tổng hợp trả ID lead/báo giá, timestamp UTC, nhóm người phụ trách và không
   ghi bearer token vào audit.
+- Phản hồi lỗi phân quyền/lỗi RPC được chuẩn hóa; kiểm thử xác nhận không trả
+  nội dung exception, chuỗi kết nối hoặc mật khẩu nội bộ cho MCP client/audit.
 - Symlink swap khi đọc file upload bị từ chối trên Windows và Linux.
 
 ## Bài nghiệm thu dữ liệu thật còn phải chạy

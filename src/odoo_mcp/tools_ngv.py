@@ -17,6 +17,10 @@ from .server_core import READ_ONLY_TOOL, _resolve_odoo, mcp
 
 MAX_PAGE_SIZE = 100
 SUMMARY_RECORD_LIMIT = 200
+ACCESS_DENIED_MESSAGE = "Access denied by gateway policy."
+QUERY_FAILED_MESSAGE = (
+    "The read-only Odoo query failed. Use request_id and server audit logs for support."
+)
 
 LEAD_FIELDS = [
     "id",
@@ -127,7 +131,7 @@ def _execute(
             duration_ms=int((time.monotonic() - started) * 1000),
         )
         return result
-    except PermissionError as exc:
+    except PermissionError:
         record_gateway_event(
             "ngv_query",
             outcome="denied",
@@ -138,8 +142,13 @@ def _execute(
             duration_ms=int((time.monotonic() - started) * 1000),
             error_code="access_denied",
         )
-        return {"success": False, "error": str(exc), "error_code": "access_denied"}
-    except Exception as exc:  # noqa: BLE001 - return a bounded MCP error envelope
+        return {
+            "success": False,
+            "error": ACCESS_DENIED_MESSAGE,
+            "error_code": "access_denied",
+            "request_id": _request_id(ctx),
+        }
+    except Exception:  # noqa: BLE001 - return a bounded MCP error envelope
         record_gateway_event(
             "ngv_query",
             outcome="error",
@@ -150,7 +159,12 @@ def _execute(
             duration_ms=int((time.monotonic() - started) * 1000),
             error_code="query_failed",
         )
-        return {"success": False, "error": str(exc), "error_code": "query_failed"}
+        return {
+            "success": False,
+            "error": QUERY_FAILED_MESSAGE,
+            "error_code": "query_failed",
+            "request_id": _request_id(ctx),
+        }
 
 
 def _result(
