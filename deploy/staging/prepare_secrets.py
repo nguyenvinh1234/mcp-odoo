@@ -15,11 +15,11 @@ def _new_secret() -> str:
     return secrets.token_urlsafe(36)
 
 
-def _write_once(path: Path, value: str) -> None:
+def _write_once(path: Path, value: str, *, mode: int = 0o644) -> None:
     if path.exists():
         raise SystemExit(f"Refusing to overwrite existing secret: {path}")
     path.write_text(value.rstrip() + "\n", encoding="utf-8")
-    path.chmod(0o600)
+    path.chmod(mode)
 
 
 def main() -> None:
@@ -107,7 +107,7 @@ def main() -> None:
             "",
         ]
     )
-    _write_once(ROOT / ".env", env)
+    _write_once(ROOT / ".env", env, mode=0o600)
     print("Created staging secret files and .env; no secret values were printed.")
 
 
