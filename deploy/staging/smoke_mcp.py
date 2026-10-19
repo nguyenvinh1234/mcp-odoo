@@ -41,15 +41,17 @@ def _structured(result: Any) -> dict[str, Any]:
 
 async def _session(token: str, calls: list[tuple[str, dict[str, Any]]]):
     headers = {"Authorization": f"Bearer {token}"}
-    async with streamable_http_client(URL, headers=headers) as streams:
-        read_stream, write_stream = streams[0], streams[1]
-        async with ClientSession(read_stream, write_stream) as session:
-            await session.initialize()
-            tools = sorted(tool.name for tool in (await session.list_tools()).tools)
-            results = {}
-            for name, arguments in calls:
-                results[name] = _structured(await session.call_tool(name, arguments))
-            return tools, results
+    async with httpx2.AsyncClient(headers=headers, timeout=30) as http_client:
+        async with streamable_http_client(URL, http_client=http_client) as streams:
+            read_stream, write_stream = streams[0], streams[1]
+            async with ClientSession(read_stream, write_stream) as session:
+                await session.initialize()
+                tools = sorted(tool.name for tool in (await session.list_tools()).tools)
+                results = {}
+                for name, arguments in calls:
+                    result = await session.call_tool(name, arguments)
+                    results[name] = _structured(result)
+                return tools, results
 
 
 def _odoo_acl_checks() -> dict[str, Any]:
