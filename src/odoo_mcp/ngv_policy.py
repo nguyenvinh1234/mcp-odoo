@@ -21,6 +21,9 @@ POLICY_FILE_ENV = "ODOO_MCP_NGV_CLIENT_POLICY_FILE"
 STDIO_CLIENT_ID_ENV = "ODOO_MCP_NGV_STDIO_CLIENT_ID"
 ALLOW_STDIO_ENV = "ODOO_MCP_NGV_ALLOW_STDIO"
 NGV_PROFILE = "ngocviet-readonly"
+NGV_STAGING_WRITE_PROFILE = "ngocviet-staging-write"
+NGV_WRITE_STAGE_ACK_ENV = "ODOO_MCP_NGV_WRITE_STAGE_ACK"
+NGV_WRITE_STAGE_ACK = "I_UNDERSTAND_STAGING_ONLY"
 
 NGV_TOOLS = frozenset(
     {
@@ -33,6 +36,17 @@ NGV_TOOLS = frozenset(
     }
 )
 
+NGV_WRITE_TOOLS = frozenset(
+    {
+        "ngv_prepare_customer_create",
+        "ngv_prepare_lead_update",
+        "ngv_prepare_draft_quotation",
+        "ngv_execute_approved_change",
+    }
+)
+
+NGV_STAGING_TOOLS = NGV_TOOLS | NGV_WRITE_TOOLS
+
 TOOL_SCOPES: dict[str, frozenset[str]] = {
     "ngv_whoami": frozenset({"odoo.read"}),
     "ngv_list_leads": frozenset({"odoo.read", "odoo.crm.read"}),
@@ -42,6 +56,18 @@ TOOL_SCOPES: dict[str, frozenset[str]] = {
     "ngv_daily_sales_summary": frozenset(
         {"odoo.read", "odoo.crm.read", "odoo.sales.read"}
     ),
+    "ngv_prepare_customer_create": frozenset(
+        {"odoo.read", "odoo.customers.read", "odoo.write.staging"}
+    ),
+    "ngv_prepare_lead_update": frozenset(
+        {"odoo.read", "odoo.crm.read", "odoo.write.staging"}
+    ),
+    "ngv_prepare_draft_quotation": frozenset(
+        {"odoo.read", "odoo.sales.read", "odoo.products.read", "odoo.write.staging"}
+    ),
+    "ngv_execute_approved_change": frozenset(
+        {"odoo.read", "odoo.write.staging"}
+    ),
 }
 
 
@@ -50,7 +76,21 @@ def _truthy(name: str) -> bool:
 
 
 def ngv_profile_enabled() -> bool:
-    return os.environ.get(SECURITY_PROFILE_ENV, "").strip() == NGV_PROFILE
+    return os.environ.get(SECURITY_PROFILE_ENV, "").strip() in {
+        NGV_PROFILE,
+        NGV_STAGING_WRITE_PROFILE,
+    }
+
+
+def ngv_staging_write_profile_enabled() -> bool:
+    return (
+        os.environ.get(SECURITY_PROFILE_ENV, "").strip()
+        == NGV_STAGING_WRITE_PROFILE
+    )
+
+
+def allowed_ngv_tools() -> frozenset[str]:
+    return NGV_STAGING_TOOLS if ngv_staging_write_profile_enabled() else NGV_TOOLS
 
 
 @dataclass(frozen=True)
@@ -108,9 +148,9 @@ def current_request_client_id() -> str | None:
 
 def authorize_ngv_tool(tool_name: str) -> ClientDecision:
     if not ngv_profile_enabled():
-        raise PermissionError("Ngoc Viet read-only security profile is not enabled")
-    if tool_name not in NGV_TOOLS:
-        raise PermissionError(f"Tool {tool_name!r} is outside the read-only allowlist")
+        raise PermissionError("Ngoc Viet security profile is not enabled")
+    if tool_name not in allowed_ngv_tools():
+        raise PermissionError(f"Tool {tool_name!r} is outside the profile allowlist")
 
     client_id, token_scopes, oauth = _request_identity()
     policy = load_client_policy()
@@ -145,32 +185,66 @@ def authorize_ngv_tool(tool_name: str) -> ClientDecision:
 
 
 def validate_ngv_startup() -> None:
-    """Fail closed when a read-only deployment enables dangerous escape hatches."""
+    """Fail closed when a Ngoc Viet deployment has an unsafe configuration."""
     if not ngv_profile_enabled():
         return
-    load_client_policy()
+    policy = load_client_policy()
     dangerous = [
         name
-        for name in (
-            "ODOO_MCP_ENABLE_WRITES",
-            "ODOO_MCP_ALLOW_UNKNOWN_METHODS",
-            "MCP_CHATTER_DIRECT",
-        )
+        for name in ("ODOO_MCP_ALLOW_UNKNOWN_METHODS", "MCP_CHATTER_DIRECT")
         if _truthy(name)
     ]
+    if not ngv_staging_write_profile_enabled() and _truthy("ODOO_MCP_ENABLE_WRITES"):
+        dangerous.append("ODOO_MCP_ENABLE_WRITES")
     if dangerous:
         raise ValueError(
-            f"{NGV_PROFILE} refuses dangerous settings: {', '.join(dangerous)}"
+            "Ngoc Viet profile refuses dangerous settings: "
+            f"{', '.join(dangerous)}"
         )
     if not os.environ.get("ODOO_MCP_AUDIT_LOG", "").strip():
-        raise ValueError(f"ODOO_MCP_AUDIT_LOG is required for {NGV_PROFILE}")
+        raise ValueError("ODOO_MCP_AUDIT_LOG is required for Ngoc Viet profiles")
+    if ngv_staging_write_profile_enabled():
+        if os.environ.get(NGV_WRITE_STAGE_ACK_ENV, "").strip() != NGV_WRITE_STAGE_ACK:
+            raise ValueError(
+                f"{NGV_STAGING_WRITE_PROFILE} requires {NGV_WRITE_STAGE_ACK_ENV}="
+                f"{NGV_WRITE_STAGE_ACK}"
+            )
+        if not _truthy("ODOO_MCP_ENABLE_WRITES"):
+            raise ValueError(
+                f"{NGV_STAGING_WRITE_PROFILE} requires ODOO_MCP_ENABLE_WRITES=1"
+            )
+        if _truthy(ALLOW_STDIO_ENV):
+            raise ValueError(
+                f"{NGV_STAGING_WRITE_PROFILE} requires authenticated HTTP; "
+                f"{ALLOW_STDIO_ENV} must remain disabled"
+            )
+        clients = policy["clients"]
+        for client_id, raw_client in clients.items():
+            if not isinstance(raw_client, dict) or raw_client.get("enabled") is not True:
+                continue
+            tools = set(raw_client.get("tools") or [])
+            if not tools.intersection(NGV_WRITE_TOOLS):
+                continue
+            instance = str(raw_client.get("instance") or "")
+            scopes = set(raw_client.get("scopes") or [])
+            if "staging" not in instance.lower():
+                raise ValueError(
+                    f"Write client {client_id!r} must map to a staging instance"
+                )
+            if raw_client.get("odoo_major") != 16:
+                raise ValueError("Staging writes are implemented only for Odoo 16")
+            if "odoo.write.staging" not in scopes:
+                raise ValueError(
+                    f"Write client {client_id!r} lacks odoo.write.staging scope"
+                )
 
 
 def ngv_posture() -> dict[str, Any]:
     return {
         "enabled": ngv_profile_enabled(),
         "profile": os.environ.get(SECURITY_PROFILE_ENV),
-        "allowed_tools": sorted(NGV_TOOLS),
+        "allowed_tools": sorted(allowed_ngv_tools()),
+        "staging_writes_enabled": ngv_staging_write_profile_enabled(),
         "client_policy_configured": bool(os.environ.get(POLICY_FILE_ENV, "").strip()),
         "local_stdio_enabled": _truthy(ALLOW_STDIO_ENV),
     }

@@ -31,7 +31,7 @@ services:
       PORT: 5432
       USER: odoo
       PASSWORD_FILE: /run/secrets/postgres_password
-    secrets: [postgres_password, odoo_full_password, odoo_crm_password]
+    secrets: [postgres_password, odoo_full_password, odoo_crm_password, odoo_writer_password]
     volumes:
       - odoo16-data:/var/lib/odoo
       - ./addons:/mnt/extra-addons:ro
@@ -67,6 +67,38 @@ services:
     mem_limit: 1536m
     pids_limit: 256
     cpus: 1.5
+
+  fixture-refresh:
+    image: odoo:16.0
+    profiles: ["test-data"]
+    restart: "no"
+    entrypoint: ["/bin/bash", "-ec"]
+    command:
+      - >-
+        export PGPASSWORD="$$(< /run/secrets/postgres_password)";
+        exec odoo shell -d ngv_mcp_staging --no-http
+        --db_host=db --db_port=5432 --db_user=odoo
+        < /opt/tests/refresh_daily_fixture.py
+    environment:
+      HOST: db
+      PORT: 5432
+      USER: odoo
+      PASSWORD_FILE: /run/secrets/postgres_password
+    secrets: [postgres_password]
+    volumes:
+      - odoo16-data:/var/lib/odoo
+      - ./addons:/mnt/extra-addons:ro
+      - ./refresh_daily_fixture.py:/opt/tests/refresh_daily_fixture.py:ro
+    networks: [backend]
+    depends_on:
+      db: {condition: service_healthy}
+    read_only: true
+    tmpfs: ["/tmp:size=64m,mode=1777"]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 768m
+    pids_limit: 160
+    cpus: 1.0
 
   oauth-stub:
     profiles: ["legacy-stub"]
@@ -201,6 +233,54 @@ services:
       timeout: 8s
       retries: 12
 
+  gateway-write:
+    image: ngv-odoo-mcp-staging:local
+    restart: unless-stopped
+    command: ["--transport", "streamable-http", "--host", "0.0.0.0", "--port", "8000", "--path", "/mcp", "--allow-remote-http"]
+    environment:
+      ODOO_CONFIG_FILE: /run/secrets/odoo_config
+      ODOO_MCP_SECURITY_PROFILE: ngocviet-staging-write
+      ODOO_MCP_NGV_WRITE_STAGE_ACK: I_UNDERSTAND_STAGING_ONLY
+      ODOO_MCP_ENABLE_WRITES: "1"
+      ODOO_MCP_NGV_CLIENT_POLICY_FILE: /run/secrets/client_policy
+      ODOO_MCP_AUDIT_LOG: /var/log/odoo-mcp/audit.jsonl
+      ODOO_MCP_LOG_JSON: "1"
+      ODOO_MCP_LOG_LEVEL: INFO
+      ODOO_MCP_AUTH_ISSUER_URL: ${MCP_AUTH_ISSUER_URL}
+      ODOO_MCP_AUTH_INTROSPECTION_URL: ${MCP_AUTH_INTROSPECTION_URL}
+      ODOO_MCP_AUTH_RESOURCE_URL: ${MCP_WRITE_RESOURCE_URL}
+      ODOO_MCP_AUTH_CLIENT_ID: ngv-odoo-mcp-staging
+      ODOO_MCP_AUTH_CLIENT_SECRET_FILE: /run/secrets/oauth_client_secret
+      ODOO_MCP_AUTH_REQUIRED_SCOPES: odoo.read,odoo.write.staging
+      ODOO_MCP_AUTH_IDENTITY_CLAIM: username
+      ODOO_MCP_AUTH_REQUIRE_AUD: "1"
+      ODOO_MCP_AUTH_REQUIRE_ISS: "1"
+      ODOO_MCP_AUTH_CACHE_TTL: "0"
+      MCP_ALLOWED_HOSTS: ${MCP_WRITE_PUBLIC_HOST},127.0.0.1:*,localhost:*,gateway-write:8000
+      MCP_ALLOWED_ORIGINS: https://${MCP_WRITE_PUBLIC_HOST}
+    secrets: [odoo_config, client_policy, oauth_client_secret]
+    volumes: [gateway-audit:/var/log/odoo-mcp]
+    ports: ["127.0.0.1:${MCP_WRITE_BIND_PORT:-8766}:8000"]
+    networks:
+      backend: {}
+      proxy:
+        aliases: [mcp-staging-write-gateway]
+    depends_on:
+      odoo16: {condition: service_healthy}
+      keycloak: {condition: service_healthy}
+    read_only: true
+    tmpfs: ["/tmp:size=64m,mode=1777"]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 512m
+    pids_limit: 128
+    cpus: 0.75
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; s=socket.create_connection(('127.0.0.1',8000),5); s.close()"]
+      interval: 15s
+      timeout: 8s
+      retries: 12
+
   smoke:
     image: ngv-odoo-mcp-staging:local
     profiles: ["test"]
@@ -241,15 +321,46 @@ services:
       MCP_AUTH_REVOCATION_URL: ${MCP_AUTH_REVOCATION_URL}
       MCP_AUTH_ISSUER_URL: ${MCP_AUTH_ISSUER_URL}
       MCP_RESOURCE_URL: ${MCP_RESOURCE_URL}
+      MCP_WRITE_RESOURCE_URL: ${MCP_WRITE_RESOURCE_URL}
     secrets:
       - oauth_client_secret
       - keycloak_full_password
       - keycloak_crm_password
+      - keycloak_writer_password
     volumes:
       - ./oauth_smoke.py:/opt/tests/oauth_smoke.py:ro
     networks: [backend]
     depends_on:
       keycloak: {condition: service_healthy}
+    read_only: true
+    tmpfs: ["/tmp:size=16m,mode=1777"]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 256m
+    pids_limit: 64
+    cpus: 0.5
+    restart: "no"
+
+  write-smoke:
+    image: ngv-odoo-mcp-staging:local
+    profiles: ["test"]
+    entrypoint: ["python"]
+    command: ["/opt/tests/smoke_write.py"]
+    environment:
+      MCP_WRITE_TEST_URL: http://gateway-write:8000/mcp
+      MCP_AUTH_TOKEN_URL: ${MCP_AUTH_TOKEN_URL}
+      MCP_AUTH_REVOCATION_URL: ${MCP_AUTH_REVOCATION_URL}
+    secrets:
+      - oauth_client_secret
+      - keycloak_full_password
+      - keycloak_writer_password
+      - odoo_config
+    volumes:
+      - gateway-audit:/var/log/odoo-mcp:ro
+      - ./smoke_write.py:/opt/tests/smoke_write.py:ro
+    networks: [backend]
+    depends_on:
+      gateway-write: {condition: service_healthy}
     read_only: true
     tmpfs: ["/tmp:size=16m,mode=1777"]
     cap_drop: [ALL]
@@ -281,7 +392,9 @@ secrets:
   oauth_crm_token: {file: ./secrets/oauth_crm_token.txt}
   odoo_full_password: {file: ./secrets/odoo_full_password.txt}
   odoo_crm_password: {file: ./secrets/odoo_crm_password.txt}
+  odoo_writer_password: {file: ./secrets/odoo_writer_password.txt}
   keycloak_db_password: {file: ./secrets/keycloak_db_password.txt}
   keycloak_admin_password: {file: ./secrets/keycloak_admin_password.txt}
   keycloak_full_password: {file: ./secrets/keycloak_full_password.txt}
   keycloak_crm_password: {file: ./secrets/keycloak_crm_password.txt}
+  keycloak_writer_password: {file: ./secrets/keycloak_writer_password.txt}

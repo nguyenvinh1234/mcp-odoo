@@ -39,7 +39,12 @@ from .write_policy import (
 from .audit import audit_posture
 from .auth import auth_posture as oauth_posture
 from .field_policy import field_policy_posture, get_field_policy
-from .ngv_policy import NGV_TOOLS, ngv_posture, ngv_profile_enabled, validate_ngv_startup
+from .ngv_policy import (
+    allowed_ngv_tools,
+    ngv_posture,
+    ngv_profile_enabled,
+    validate_ngv_startup,
+)
 
 
 def _srv() -> Any:
@@ -68,6 +73,8 @@ class AppContext:
     _clients_lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
     schema_cache: Any = field(default_factory=_build_schema_cache)
     write_approvals: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    ngv_write_approvals: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    ngv_write_lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
 
     @property
     def odoo(self) -> OdooClient:
@@ -736,7 +743,7 @@ def apply_tool_filter() -> None:
     from fnmatch import fnmatch
 
     if ngv_profile_enabled():
-        include = sorted(NGV_TOOLS)
+        include = sorted(allowed_ngv_tools())
         exclude: list[str] = []
         # Generic resources accept arbitrary model names/record IDs and would
         # bypass the fixed business-tool allowlist. Prompts are not needed by

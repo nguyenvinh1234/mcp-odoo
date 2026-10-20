@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+  <record id="company_isolation_fixture" model="res.company">
+    <field name="name">NGV MCP Isolated Company Fixture</field>
+  </record>
+  <record id="partner_isolation_fixture" model="res.partner">
+    <field name="name">NGV MCP CROSS COMPANY MUST STAY HIDDEN</field>
+    <field name="company_type">company</field>
+    <field name="customer_rank">1</field>
+    <field name="company_id" ref="company_isolation_fixture"/>
+  </record>
+</odoo>

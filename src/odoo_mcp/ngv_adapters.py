@@ -96,9 +96,41 @@ class Odoo20ReadOnlyAdapter(ReadOnlyOdooAdapter):
     expected_transport = "json2"
 
 
+class Odoo16StagingWriteAdapter(Odoo16ReadOnlyAdapter):
+    """Hard-coded bridge to the staging addon's narrow transactional writer."""
+
+    def execute_request(
+        self,
+        *,
+        action: str,
+        request_key: str,
+        payload_hash: str,
+        client_digest: str,
+        payload: dict[str, Any],
+    ) -> dict[str, Any]:
+        result = self.client.execute_method(
+            "ngv.mcp.request",
+            "execute_request",
+            action,
+            request_key,
+            payload_hash,
+            client_digest,
+            payload,
+        )
+        if not isinstance(result, dict):
+            raise ValueError("Staging writer returned an invalid response")
+        return cast(dict[str, Any], result)
+
+
 def build_read_only_adapter(client: Any, expected_major: int) -> ReadOnlyOdooAdapter:
     if expected_major == 16:
         return Odoo16ReadOnlyAdapter(client)
     if expected_major == 20:
         return Odoo20ReadOnlyAdapter(client)
     raise ValueError("Only Odoo 16 and Odoo 20 adapters are supported")
+
+
+def build_staging_write_adapter(client: Any, expected_major: int) -> Odoo16StagingWriteAdapter:
+    if expected_major != 16:
+        raise ValueError("Staging writes are implemented only for Odoo 16")
+    return Odoo16StagingWriteAdapter(client)

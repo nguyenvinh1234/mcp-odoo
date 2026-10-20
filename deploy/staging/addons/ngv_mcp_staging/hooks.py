@@ -29,6 +29,7 @@ def post_init_hook(cr, registry):
     env = api.Environment(cr, SUPERUSER_ID, {})
     crm_group = env.ref("ngv_mcp_staging.group_mcp_crm_readonly")
     full_group = env.ref("ngv_mcp_staging.group_mcp_full_readonly")
+    writer_group = env.ref("ngv_mcp_staging.group_mcp_staging_writer")
     full_user = _user(
         env,
         login="mcp-full@staging.invalid",
@@ -43,6 +44,13 @@ def post_init_hook(cr, registry):
         password=_secret("odoo_crm_password"),
         group=crm_group,
     )
+    writer_user = _user(
+        env,
+        login="mcp-writer@staging.invalid",
+        name="MCP Controlled Writer Staging",
+        password=_secret("odoo_writer_password"),
+        group=writer_group,
+    )
 
     customer = env["res.partner"].create(
         {"name": "NGV Staging Customer", "company_type": "company", "customer_rank": 1}
@@ -53,6 +61,14 @@ def post_init_hook(cr, registry):
             "type": "lead",
             "partner_id": customer.id,
             "user_id": full_user.id,
+        }
+    )
+    env["crm.lead"].create(
+        {
+            "name": "NGV staging lead writer",
+            "type": "lead",
+            "partner_id": customer.id,
+            "user_id": writer_user.id,
         }
     )
     env["crm.lead"].create(
