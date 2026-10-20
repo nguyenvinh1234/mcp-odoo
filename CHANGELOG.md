@@ -14,6 +14,13 @@ All notable changes to this project will be documented in this file.
 - Added a resource-limited Odoo 16 staging fixture, two read-only ACL identities,
   a private RFC 7662 test introspection service, and an automated MCP E2E smoke test.
 
+### Fixed
+
+- MCP Inspector smoke now distinguishes the registered 47-tool full surface
+  from the exact six-tool `ngocviet-readonly` surface. The restricted profile
+  fails if any generic or write-capable tool remains visible; calls also still
+  require its client policy and OAuth scopes.
+
 ### Security
 
 - The Ngoc Viet profile removes generic tools, resources, templates, and

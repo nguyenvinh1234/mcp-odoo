@@ -746,7 +746,27 @@ def mcp_env(
     return env
 
 
-def assert_tool_surface(tool_names: set[str]) -> None:
+def assert_tool_surface(
+    tool_names: set[str], *, security_profile: str | None = None
+) -> None:
+    ngv_tools = {
+        "ngv_whoami",
+        "ngv_list_leads",
+        "ngv_list_customers",
+        "ngv_list_quotations",
+        "ngv_list_products",
+        "ngv_daily_sales_summary",
+    }
+    if security_profile == "ngocviet-readonly":
+        if tool_names != ngv_tools:
+            raise AssertionError(
+                "Ngoc Viet read-only MCP surface must expose exactly six tools: "
+                f"{sorted(tool_names)}"
+            )
+        return
+    if security_profile not in {None, ""}:
+        raise AssertionError(f"Unknown MCP security profile: {security_profile!r}")
+
     expected_tools = {
         "execute_method",
         "list_models",
@@ -775,7 +795,15 @@ def assert_tool_surface(tool_names: set[str]) -> None:
         "list_instances",
         "lookup_model_history",
         "read_attachment",
+        *ngv_tools,
     }
+    # 41 historical tools plus the six opt-in Ngoc Viet read-only tools.
+    # Registration is visible on the default surface; the ngocviet-readonly
+    # profile is a separate, fail-closed six-tool surface checked above.
+    if len(tool_names) != 47:
+        raise AssertionError(
+            f"MCP surface did not report 47 tools: {sorted(tool_names)}"
+        )
     if not expected_tools <= tool_names:
         raise AssertionError(f"Missing MCP tools: {expected_tools - tool_names}")
 
@@ -1087,8 +1115,8 @@ async def mcp_stdio_smoke(
                 await session.call_tool("health_check", arguments={}),
                 "health_check",
             )
-            if health.get("server", {}).get("tool_count") != 41:
-                raise AssertionError(f"health_check did not report 41 tools: {health}")
+            if health.get("server", {}).get("tool_count") != 47:
+                raise AssertionError(f"health_check did not report 47 tools: {health}")
             if "chatter_direct_enabled" not in health.get("runtime", {}):
                 raise AssertionError(
                     f"health_check did not surface chatter_direct posture: {health}"

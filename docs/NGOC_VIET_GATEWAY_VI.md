@@ -97,6 +97,13 @@ client policy. Chỉ đánh dấu PASS khi ChatGPT thực sự gọi `ngv_whoami
 gọi một tool dữ liệu và audit ghi cùng client ID. Nút Connect không phải bằng
 chứng E2E.
 
+Tính đến ngày 20-10-2026, việc thêm MCP tùy chỉnh phụ thuộc gói ChatGPT và giao
+diện quản trị workspace. ChatGPT Plus của chủ dự án chưa hiển thị mục thêm MCP
+tùy chỉnh, vì vậy kết nối ChatGPT Cloud phải ghi `BLOCKED`, không được suy ra từ
+việc endpoint HTTPS hoạt động. Tham khảo tài liệu chính thức về
+[Developer mode và full MCP](https://help.openai.com/en/articles/12584461-developer-mode-and-full-mcp-connectors-in-chatgpt)
+và [OAuth cho app/MCP](https://developers.openai.com/plugins/build/auth).
+
 ### Claude/Codex local qua stdio
 
 Stdio chỉ dành cho một tiến trình riêng trên máy tin cậy. Đặt:
@@ -113,6 +120,31 @@ ODOO_CONFIG_FILE=<đường dẫn cấu hình instance>
 Không bật `ALLOW_STDIO` trên gateway HTTP dùng chung. Claude Desktop có thể dùng
 stdio local; Claude remote/ChatGPT phải qua HTTPS OAuth. Khả năng web, iPhone và
 Voice phải báo PASS/FAIL/NOT TESTED riêng.
+
+## Kiểm tra bề mặt tool bằng MCP Inspector
+
+Profile mặc định/toàn bộ phải hiện đúng 47 tool ở commit hiện tại. Profile
+`ngocviet-readonly` phải hiện **chính xác** sáu tool trong bảng trên và không có
+`execute_method`, resource hay prompt.
+
+MCP Inspector không tự chuyển toàn bộ biến môi trường của tiến trình cha sang
+stdio server. Phải truyền từng biến bằng `-e KEY=VALUE`; nếu không, kết quả 47
+tool chỉ chứng minh profile mặc định đã khởi động, không chứng minh profile chỉ
+đọc bị lỗi. Ví dụ:
+
+```bash
+npx @modelcontextprotocol/inspector --cli \
+  -e ODOO_MCP_SECURITY_PROFILE=ngocviet-readonly \
+  -e ODOO_MCP_NGV_ALLOW_STDIO=1 \
+  -e ODOO_MCP_NGV_STDIO_CLIENT_ID=<client-id> \
+  -e ODOO_MCP_NGV_CLIENT_POLICY_FILE=<policy.json> \
+  -e ODOO_MCP_AUDIT_LOG=<audit.jsonl> \
+  -e ODOO_CONFIG_FILE=<odoo-config.json> \
+  uv -- run odoo-mcp --transport stdio --method tools/list
+```
+
+Khi dùng `--format json -q`, danh sách nằm trong `result.tools`, không nằm ở
+trường `tools` cấp cao nhất.
 
 ## Nghiệm thu và rollback
 
