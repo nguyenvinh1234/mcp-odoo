@@ -15,6 +15,20 @@ from mcp.client.streamable_http import streamable_http_client
 
 
 URL = os.environ.get("MCP_TEST_URL", "http://gateway:8000/mcp")
+TOKEN_URL = os.environ["MCP_AUTH_TOKEN_URL"]
+REVOCATION_URL = os.environ["MCP_AUTH_REVOCATION_URL"]
+CLIENT_ID = "ngv-odoo-mcp-staging"
+FULL_IDENTITY = "staging-full-ai"
+CRM_IDENTITY = "staging-crm-ai"
+REQUESTED_SCOPES = " ".join(
+    [
+        "odoo.read",
+        "odoo.crm.read",
+        "odoo.customers.read",
+        "odoo.sales.read",
+        "odoo.products.read",
+    ]
+)
 
 
 def _secret(name: str) -> str:
@@ -52,6 +66,48 @@ async def _session(token: str, calls: list[tuple[str, dict[str, Any]]]):
                     result = await session.call_tool(name, arguments)
                     results[name] = _structured(result)
                 return tools, results
+
+
+async def _oauth_token(username: str, password_secret: str) -> str:
+    async with httpx2.AsyncClient(timeout=20) as client:
+        response = await client.post(
+            TOKEN_URL,
+            data={
+                "grant_type": "password",
+                "client_id": CLIENT_ID,
+                "client_secret": _secret("oauth_client_secret"),
+                "username": username,
+                "password": _secret(password_secret),
+                "scope": REQUESTED_SCOPES,
+            },
+        )
+    response.raise_for_status()
+    payload = response.json()
+    token = payload.get("access_token")
+    assert isinstance(token, str) and token
+    return token
+
+
+async def _revoke(token: str) -> int:
+    async with httpx2.AsyncClient(timeout=20) as client:
+        response = await client.post(
+            REVOCATION_URL,
+            data={
+                "token": token,
+                "token_type_hint": "access_token",
+                "client_id": CLIENT_ID,
+                "client_secret": _secret("oauth_client_secret"),
+            },
+        )
+        response.raise_for_status()
+        revoked = await client.get(
+            URL,
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Accept": "text/event-stream",
+            },
+        )
+    return revoked.status_code
 
 
 def _odoo_acl_checks() -> dict[str, Any]:
@@ -113,8 +169,11 @@ async def main() -> None:
         unauthenticated = await client.get(URL, headers={"Accept": "text/event-stream"})
     assert unauthenticated.status_code == 401
 
+    full_token = await _oauth_token("staging-full-ai", "keycloak_full_password")
+    crm_token = await _oauth_token("staging-crm-ai", "keycloak_crm_password")
+
     full_tools, full = await _session(
-        _secret("oauth_full_token"),
+        full_token,
         [
             ("ngv_whoami", {}),
             ("ngv_list_leads", {"limit": 20}),
@@ -123,7 +182,7 @@ async def main() -> None:
         ],
     )
     crm_tools, crm = await _session(
-        _secret("oauth_crm_token"),
+        crm_token,
         [
             ("ngv_whoami", {}),
             ("ngv_list_leads", {"limit": 20}),
@@ -140,21 +199,25 @@ async def main() -> None:
     summary = full["ngv_daily_sales_summary"]
     assert summary["queried_at"] and summary["leads_today"]["record_ids"]
     assert summary["unprocessed_quotations"]["record_ids"]
+    revoked_status = await _revoke(crm_token)
+    assert revoked_status == 401
 
     audit_lines = audit_path.read_text(encoding="utf-8").splitlines()
     audit_rows = [json.loads(line) for line in audit_lines[audit_before:]]
     assert any(row.get("outcome") == "success" for row in audit_rows)
     assert any(
         row.get("outcome") == "denied"
-        and row.get("client_id") == "staging-crm-ai"
+        and row.get("client_id") == CRM_IDENTITY
         for row in audit_rows
     )
     audit_text = audit_path.read_text(encoding="utf-8")
-    assert _secret("oauth_full_token") not in audit_text
-    assert _secret("oauth_crm_token") not in audit_text
+    assert full_token not in audit_text
+    assert crm_token not in audit_text
 
     report = {
         "mcp_unauthenticated_status": unauthenticated.status_code,
+        "revoked_token_status": revoked_status,
+        "oauth_identities": [FULL_IDENTITY, CRM_IDENTITY],
         "tool_count": len(full_tools),
         "full_odoo_user_id": full["ngv_whoami"]["record_ids"][0],
         "crm_odoo_user_id": crm["ngv_whoami"]["record_ids"][0],

@@ -31,6 +31,8 @@ logs/
 .env.development.local
 .env.test.local
 .env.production.local
+*.env.pre-keycloak-*
+.env.pre-keycloak-*
 
 # Odoo specific
 odoo_config.json
@@ -56,6 +58,7 @@ coverage.xml
 .mypy_cache/
 .pytest_cache/
 .ruff_cache/
+.artifacts/
 
 # Local AI orchestration / planning artifacts
 .omc/

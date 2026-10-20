@@ -23,7 +23,8 @@ Env vars:
 - ODOO_MCP_AUTH_CACHE_TTL           seconds to cache introspection verdicts
                                     (default 60; 0 disables; a revoked token
                                     stays accepted for at most this long)
-- ODOO_MCP_AUTH_IDENTITY_CLAIM      auto, client_id, or sub (default auto)
+- ODOO_MCP_AUTH_IDENTITY_CLAIM      auto, client_id, sub, username, or
+                                    preferred_username (default auto)
 """
 
 from __future__ import annotations
@@ -128,8 +129,17 @@ class IntrospectionTokenVerifier(TokenVerifier):
         self.require_aud = require_aud
         self.require_iss = require_iss
         self.timeout_seconds = timeout_seconds
-        if identity_claim not in {"auto", "client_id", "sub"}:
-            raise ValueError("identity_claim must be auto, client_id, or sub")
+        if identity_claim not in {
+            "auto",
+            "client_id",
+            "sub",
+            "username",
+            "preferred_username",
+        }:
+            raise ValueError(
+                "identity_claim must be auto, client_id, sub, username, or "
+                "preferred_username"
+            )
         self.identity_claim = identity_claim
         self._transport = transport  # test seam (httpx2.MockTransport)
         # Cache introspection verdicts so hot agent loops don't hammer the

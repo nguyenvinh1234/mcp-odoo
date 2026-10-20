@@ -69,6 +69,7 @@ services:
     cpus: 1.5
 
   oauth-stub:
+    profiles: ["legacy-stub"]
     image: python:3.10-slim
     user: "65534:65534"
     restart: unless-stopped
@@ -94,6 +95,63 @@ services:
       timeout: 5s
       retries: 12
 
+  keycloak-db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD_FILE: /run/secrets/keycloak_db_password
+    secrets: [keycloak_db_password]
+    volumes: [keycloak-db:/var/lib/postgresql/data]
+    networks: [backend]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keycloak -d keycloak"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 384m
+    pids_limit: 128
+    cpus: 0.75
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.8.1
+    restart: unless-stopped
+    entrypoint: ["/bin/bash", "/opt/keycloak/bin/start-ngv-keycloak.sh"]
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://keycloak-db:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_HOSTNAME: https://${MCP_AUTH_PUBLIC_HOST}
+      KC_HTTP_ENABLED: "true"
+      KC_PROXY_HEADERS: xforwarded
+      KC_HOSTNAME_STRICT: "true"
+      KC_HEALTH_ENABLED: "true"
+      KC_HTTP_MANAGEMENT_HEALTH_ENABLED: "true"
+      JAVA_OPTS_APPEND: -Xms256m -Xmx640m -XX:MaxRAMPercentage=70
+    secrets: [keycloak_db_password, keycloak_admin_password]
+    volumes:
+      - ./keycloak_start.sh:/opt/keycloak/bin/start-ngv-keycloak.sh:ro
+      - ./secrets/keycloak_realm.json:/opt/keycloak/data/import/ngv-mcp-staging-realm.json:ro
+    networks:
+      backend: {}
+      proxy:
+        aliases: [mcp-staging-keycloak]
+    depends_on:
+      keycloak-db: {condition: service_healthy}
+    command: ["start", "--import-realm"]
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/9000; printf 'GET /health/ready HTTP/1.0\\r\\n\\r\\n' >&3; grep -q '200 OK' <&3"]
+      interval: 15s
+      timeout: 8s
+      start_period: 90s
+      retries: 20
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 1g
+    pids_limit: 320
+    cpus: 1.5
+
   gateway:
     image: ngv-odoo-mcp-staging:local
     build:
@@ -114,19 +172,22 @@ services:
       ODOO_MCP_AUTH_CLIENT_ID: ngv-odoo-mcp-staging
       ODOO_MCP_AUTH_CLIENT_SECRET_FILE: /run/secrets/oauth_client_secret
       ODOO_MCP_AUTH_REQUIRED_SCOPES: odoo.read
-      ODOO_MCP_AUTH_IDENTITY_CLAIM: sub
+      ODOO_MCP_AUTH_IDENTITY_CLAIM: username
       ODOO_MCP_AUTH_REQUIRE_AUD: "1"
       ODOO_MCP_AUTH_REQUIRE_ISS: "1"
-      ODOO_MCP_AUTH_CACHE_TTL: "15"
+      ODOO_MCP_AUTH_CACHE_TTL: "0"
       MCP_ALLOWED_HOSTS: ${MCP_PUBLIC_HOST},127.0.0.1:*,localhost:*,gateway:8000
       MCP_ALLOWED_ORIGINS: https://${MCP_PUBLIC_HOST}
     secrets: [odoo_config, client_policy, oauth_client_secret]
     volumes: [gateway-audit:/var/log/odoo-mcp]
     ports: ["127.0.0.1:${MCP_BIND_PORT:-8765}:8000"]
-    networks: [backend, edge]
+    networks:
+      backend: {}
+      proxy:
+        aliases: [mcp-staging-gateway]
     depends_on:
       odoo16: {condition: service_healthy}
-      oauth-stub: {condition: service_healthy}
+      keycloak: {condition: service_healthy}
     read_only: true
     tmpfs: ["/tmp:size=64m,mode=1777"]
     cap_drop: [ALL]
@@ -144,11 +205,19 @@ services:
     image: ngv-odoo-mcp-staging:local
     profiles: ["test"]
     entrypoint: ["python"]
-    command: ["/app/deploy/staging/smoke_mcp.py"]
+    command: ["/opt/tests/smoke_mcp.py"]
     environment:
       MCP_TEST_URL: http://gateway:8000/mcp
-    secrets: [oauth_full_token, oauth_crm_token, odoo_config]
-    volumes: [gateway-audit:/var/log/odoo-mcp:ro]
+      MCP_AUTH_TOKEN_URL: ${MCP_AUTH_TOKEN_URL}
+      MCP_AUTH_REVOCATION_URL: ${MCP_AUTH_REVOCATION_URL}
+    secrets:
+      - oauth_client_secret
+      - keycloak_full_password
+      - keycloak_crm_password
+      - odoo_config
+    volumes:
+      - gateway-audit:/var/log/odoo-mcp:ro
+      - ./smoke_mcp.py:/opt/tests/smoke_mcp.py:ro
     networks: [backend]
     depends_on:
       gateway: {condition: service_healthy}
@@ -161,14 +230,47 @@ services:
     cpus: 0.5
     restart: "no"
 
+  oauth-smoke:
+    image: ngv-odoo-mcp-staging:local
+    profiles: ["test"]
+    entrypoint: ["python"]
+    command: ["/opt/tests/oauth_smoke.py"]
+    environment:
+      MCP_AUTH_TOKEN_URL: ${MCP_AUTH_TOKEN_URL}
+      MCP_AUTH_INTROSPECTION_URL: ${MCP_AUTH_INTROSPECTION_URL}
+      MCP_AUTH_REVOCATION_URL: ${MCP_AUTH_REVOCATION_URL}
+      MCP_AUTH_ISSUER_URL: ${MCP_AUTH_ISSUER_URL}
+      MCP_RESOURCE_URL: ${MCP_RESOURCE_URL}
+    secrets:
+      - oauth_client_secret
+      - keycloak_full_password
+      - keycloak_crm_password
+    volumes:
+      - ./oauth_smoke.py:/opt/tests/oauth_smoke.py:ro
+    networks: [backend]
+    depends_on:
+      keycloak: {condition: service_healthy}
+    read_only: true
+    tmpfs: ["/tmp:size=16m,mode=1777"]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 256m
+    pids_limit: 64
+    cpus: 0.5
+    restart: "no"
+
 networks:
   backend: {internal: true}
   edge: {}
+  proxy:
+    external: true
+    name: nginx_network
 
 volumes:
   odoo16-db: {}
   odoo16-data: {}
   gateway-audit: {}
+  keycloak-db: {}
 
 secrets:
   postgres_password: {file: ./secrets/postgres_password.txt}
@@ -179,3 +281,7 @@ secrets:
   oauth_crm_token: {file: ./secrets/oauth_crm_token.txt}
   odoo_full_password: {file: ./secrets/odoo_full_password.txt}
   odoo_crm_password: {file: ./secrets/odoo_crm_password.txt}
+  keycloak_db_password: {file: ./secrets/keycloak_db_password.txt}
+  keycloak_admin_password: {file: ./secrets/keycloak_admin_password.txt}
+  keycloak_full_password: {file: ./secrets/keycloak_full_password.txt}
+  keycloak_crm_password: {file: ./secrets/keycloak_crm_password.txt}
