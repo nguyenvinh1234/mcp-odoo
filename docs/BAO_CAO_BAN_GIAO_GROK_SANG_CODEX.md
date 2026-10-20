@@ -5,6 +5,7 @@ Repository: `https://github.com/nguyenvinh1234/mcp-odoo`
 PR: `https://github.com/nguyenvinh1234/mcp-odoo/pull/1`  
 Branch: `codex/odoo16-readonly-gateway`  
 Mốc tiếp nhận đã xác minh: `374b6d6ae87790253b3c537ef9359a3ca0377f35`
+Commit sửa Inspector đã kiểm thử CI: `cc3a64990ec8f5beeaf26eff0bcd9eca80d3dce4`
 
 ## 1. Phạm vi và ranh giới
 
@@ -73,13 +74,14 @@ Inspector dùng `result.tools`; đọc nhầm `tools` cấp cao nhất sẽ cho 
 | test Python 3.10/3.11/3.12 | PASS | Có |
 | Trivy | PASS | Có |
 | build | PASS | Có |
-| mcp-inspector | FAIL | Có |
+| mcp-inspector | PASS — 2m41s | Có |
 | publish/Smithery/MCPB/registry | SKIPPED | Không phải lỗi nghiệm thu trên PR |
 
-Nguyên nhân duy nhất đã xác định của job `mcp-inspector`: smoke script cũ đòi
-health check có 41 tool, trong khi server trả đúng 47 tool. Thay đổi Grok sửa
-41 thành 47; Codex bổ sung kiểm tra profile chỉ đọc phải đúng sáu tool. Trạng
-thái CI sau commit mới phải được GitHub xác nhận, không suy ra từ local.
+Tại mốc tiếp nhận, job `mcp-inspector` FAIL vì smoke script cũ đòi health check
+có 41 tool, trong khi server trả đúng 47 tool. Thay đổi Grok sửa 41 thành 47;
+Codex bổ sung kiểm tra profile chỉ đọc phải đúng sáu tool. GitHub Actions tại
+commit `cc3a649` đã xác nhận lại toàn bộ job nghiệm thu PASS; các job publish
+được SKIPPED đúng thiết kế của pull request.
 
 ## 6. Bằng chứng staging Odoo 16 đã chạy
 
@@ -162,7 +164,7 @@ subject.
 
 - **Mã nguồn + unit/security/Inspector local:** PASS.
 - **Odoo 16 staging + OAuth + hai quyền + audit:** PASS tại commit `374b6d6`.
-- **CI commit bàn giao:** PENDING cho đến khi GitHub chạy xong.
+- **CI commit sửa Inspector `cc3a649`:** PASS toàn bộ job nghiệm thu.
 - **ChatGPT Cloud:** BLOCKED bởi khả năng tài khoản/workspace.
 - **Odoo 16 production read-only:** NOT TESTED, production không bị thay đổi.
 - **Odoo 20 thực tế:** NOT TESTED.
