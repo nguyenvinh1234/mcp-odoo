@@ -97,7 +97,15 @@ def main() -> None:
                 "password": _secret("keycloak_writer_password"),
             }
         )
-        authenticated = client.post(urljoin(str(login.url), parser.action), data=form)
+        login_action = urljoin(str(login.url), parser.action)
+        parsed_action = urlparse(login_action)
+        internal_issuer = urlparse(issuer_internal)
+        if parsed_action.netloc != internal_issuer.netloc:
+            login_action = parsed_action._replace(
+                scheme=internal_issuer.scheme,
+                netloc=internal_issuer.netloc,
+            ).geturl()
+        authenticated = client.post(login_action, data=form)
         assert authenticated.status_code in {302, 303}
         location = authenticated.headers["location"]
         parsed = urlparse(location)
