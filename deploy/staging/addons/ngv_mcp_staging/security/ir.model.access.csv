@@ -24,3 +24,4 @@ access_mcp_writer_crm_team,access.mcp.writer.crm.team,sales_team.model_crm_team,
 access_mcp_writer_crm_stage,access.mcp.writer.crm.stage,crm.model_crm_stage,ngv_mcp_staging.group_mcp_staging_writer,1,0,0,0
 access_mcp_writer_product_template,access.mcp.writer.product.template,product.model_product_template,ngv_mcp_staging.group_mcp_staging_writer,1,0,0,0
 access_mcp_writer_res_currency,access.mcp.writer.res.currency,base.model_res_currency,ngv_mcp_staging.group_mcp_staging_writer,1,0,0,0
+access_mcp_writer_ir_sequence,access.mcp.writer.ir.sequence,base.model_ir_sequence,ngv_mcp_staging.group_mcp_staging_writer,1,0,0,0
