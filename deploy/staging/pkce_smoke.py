@@ -139,7 +139,7 @@ def main() -> None:
         assert "odoo.write.staging" in str(data.get("scope", "")).split()
 
         whoami = asyncio.run(_whoami(token))
-        assert whoami.get("client_id") == "staging-writer-ai"
+        assert whoami.get("gateway_client_id") == "staging-writer-ai"
 
         revoked = client.post(
             revocation_url,
