@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <record id="rule_mcp_crm_partner_company" model="ir.rule">
+    <field name="name">MCP staging read partner company boundary</field>
+    <field name="model_id" ref="base.model_res_partner"/>
+    <field name="groups" eval="[(4, ref('ngv_mcp_staging.group_mcp_crm_readonly'))]"/>
+    <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
+  </record>
+  <record id="rule_mcp_crm_lead_owner" model="ir.rule">
+    <field name="name">MCP staging CRM read owner boundary</field>
+    <field name="model_id" ref="crm.model_crm_lead"/>
+    <field name="groups" eval="[(4, ref('ngv_mcp_staging.group_mcp_crm_readonly'))]"/>
+    <field name="domain_force">['|', ('user_id', '=', False), ('user_id', '=', user.id)]</field>
+  </record>
+  <record id="rule_mcp_full_lead_company" model="ir.rule">
+    <field name="name">MCP staging full read lead company boundary</field>
+    <field name="model_id" ref="crm.model_crm_lead"/>
+    <field name="groups" eval="[(4, ref('ngv_mcp_staging.group_mcp_full_readonly'))]"/>
+    <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+  </record>
+  <record id="rule_mcp_full_order_company" model="ir.rule">
+    <field name="name">MCP staging full read quotation company boundary</field>
+    <field name="model_id" ref="sale.model_sale_order"/>
+    <field name="groups" eval="[(4, ref('ngv_mcp_staging.group_mcp_full_readonly'))]"/>
+    <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+  </record>
+  <record id="rule_mcp_writer_partner_company" model="ir.rule">
+    <field name="name">MCP staging writer partner company boundary</field>
+    <field name="model_id" ref="base.model_res_partner"/>
+    <field name="groups" eval="[(4, ref('ngv_mcp_staging.group_mcp_staging_writer'))]"/>
+    <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
+    <field name="perm_unlink" eval="False"/>
+  </record>
+  <record id="rule_mcp_writer_lead_owner" model="ir.rule">
+    <field name="name">MCP staging writer lead owner boundary</field>
+    <field name="model_id" ref="crm.model_crm_lead"/>
+    <field name="groups" eval="[(4, ref('ngv_mcp_staging.group_mcp_staging_writer'))]"/>
+    <field name="domain_force">['|', ('user_id', '=', False), ('user_id', '=', user.id)]</field>
+    <field name="perm_unlink" eval="False"/>
+  </record>
+  <record id="rule_mcp_writer_order_owner" model="ir.rule">
+    <field name="name">MCP staging writer quotation owner boundary</field>
+    <field name="model_id" ref="sale.model_sale_order"/>
+    <field name="groups" eval="[(4, ref('ngv_mcp_staging.group_mcp_staging_writer'))]"/>
+    <field name="domain_force">['|', ('user_id', '=', False), ('user_id', '=', user.id)]</field>
+    <field name="perm_write" eval="False"/>
+    <field name="perm_unlink" eval="False"/>
+  </record>
+  <record id="rule_mcp_writer_product_company" model="ir.rule">
+    <field name="name">MCP staging writer product company boundary</field>
+    <field name="model_id" ref="product.model_product_template"/>
+    <field name="groups" eval="[(4, ref('ngv_mcp_staging.group_mcp_staging_writer'))]"/>
+    <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
+  </record>
+  <record id="rule_mcp_writer_product_variant_company" model="ir.rule">
+    <field name="name">MCP staging writer product variant company boundary</field>
+    <field name="model_id" ref="product.model_product_product"/>
+    <field name="groups" eval="[(4, ref('ngv_mcp_staging.group_mcp_staging_writer'))]"/>
+    <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
+  </record>
+  <record id="rule_mcp_writer_order_line_owner" model="ir.rule">
+    <field name="name">MCP staging writer quotation line owner boundary</field>
+    <field name="model_id" ref="sale.model_sale_order_line"/>
+    <field name="groups" eval="[(4, ref('ngv_mcp_staging.group_mcp_staging_writer'))]"/>
+    <field name="domain_force">[('order_id.user_id', '=', user.id)]</field>
+    <field name="perm_write" eval="False"/>
+    <field name="perm_unlink" eval="False"/>
+  </record>
+  <record id="rule_mcp_writer_request_owner" model="ir.rule">
+    <field name="name">MCP staging writer request owner boundary</field>
+    <field name="model_id" ref="model_ngv_mcp_request"/>
+    <field name="groups" eval="[(4, ref('ngv_mcp_staging.group_mcp_staging_writer'))]"/>
+    <field name="domain_force">[('user_id', '=', user.id)]</field>
+    <field name="perm_write" eval="False"/>
+    <field name="perm_unlink" eval="False"/>
+  </record>
+</odoo>

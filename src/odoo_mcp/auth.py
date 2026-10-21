@@ -23,6 +23,8 @@ Env vars:
 - ODOO_MCP_AUTH_CACHE_TTL           seconds to cache introspection verdicts
                                     (default 60; 0 disables; a revoked token
                                     stays accepted for at most this long)
+- ODOO_MCP_AUTH_IDENTITY_CLAIM      auto, client_id, sub, username, or
+                                    preferred_username (default auto)
 """
 
 from __future__ import annotations
@@ -31,6 +33,7 @@ import hashlib
 import logging
 import os
 import time
+from pathlib import Path
 from typing import Any
 
 import httpx2
@@ -46,7 +49,16 @@ AUTH_ENV_PREFIX = "ODOO_MCP_AUTH_"
 
 
 def _env(name: str) -> str | None:
-    value = os.environ.get(f"{AUTH_ENV_PREFIX}{name}", "").strip()
+    key = f"{AUTH_ENV_PREFIX}{name}"
+    value = os.environ.get(key, "").strip()
+    file_path = os.environ.get(f"{key}_FILE", "").strip()
+    if value and file_path:
+        raise ValueError(f"Set only one of {key} and {key}_FILE")
+    if file_path:
+        try:
+            value = Path(file_path).read_text(encoding="utf-8").strip()
+        except OSError as exc:
+            raise ValueError(f"Cannot read {key}_FILE: {exc}") from exc
     return value or None
 
 
@@ -87,6 +99,7 @@ def auth_posture() -> dict[str, Any]:
         "require_aud": _env_flag("REQUIRE_AUD"),
         "require_iss": _env_flag("REQUIRE_ISS"),
         "introspection_cache_ttl": _cache_ttl(),
+        "identity_claim": _env("IDENTITY_CLAIM") or "auto",
     }
 
 
@@ -104,6 +117,7 @@ class IntrospectionTokenVerifier(TokenVerifier):
         require_aud: bool = False,
         require_iss: bool = False,
         cache_ttl_seconds: float = 0.0,
+        identity_claim: str = "auto",
         timeout_seconds: float = 10.0,
         transport: httpx2.AsyncBaseTransport | None = None,
     ) -> None:
@@ -115,6 +129,18 @@ class IntrospectionTokenVerifier(TokenVerifier):
         self.require_aud = require_aud
         self.require_iss = require_iss
         self.timeout_seconds = timeout_seconds
+        if identity_claim not in {
+            "auto",
+            "client_id",
+            "sub",
+            "username",
+            "preferred_username",
+        }:
+            raise ValueError(
+                "identity_claim must be auto, client_id, sub, username, or "
+                "preferred_username"
+            )
+        self.identity_claim = identity_claim
         self._transport = transport  # test seam (httpx2.MockTransport)
         # Cache introspection verdicts so hot agent loops don't hammer the
         # AS on every MCP request. Verdicts (including rejections) live at
@@ -204,9 +230,19 @@ class IntrospectionTokenVerifier(TokenVerifier):
 
         scope_raw = payload.get("scope", "")
         scopes = scope_raw.split() if isinstance(scope_raw, str) else []
+        if self.identity_claim == "auto":
+            identity = payload.get("client_id") or payload.get("sub")
+        else:
+            identity = payload.get(self.identity_claim)
+        if not identity:
+            logger.warning(
+                "token introspection returned no %s identity claim; rejecting",
+                self.identity_claim,
+            )
+            return None
         return AccessToken(
             token=token,
-            client_id=str(payload.get("client_id") or payload.get("sub") or "unknown"),
+            client_id=str(identity),
             scopes=scopes,
             expires_at=(
                 int(expires_at) if isinstance(expires_at, (int, float)) else None
@@ -238,6 +274,7 @@ def build_auth() -> tuple[AuthSettings, IntrospectionTokenVerifier] | None:
         issuer_url=AnyHttpUrl(issuer),
         resource_server_url=AnyHttpUrl(resource),
         required_scopes=auth_required_scopes() or None,
+        validate_token_resource=True,
     )
     verifier = IntrospectionTokenVerifier(
         introspection,
@@ -248,5 +285,6 @@ def build_auth() -> tuple[AuthSettings, IntrospectionTokenVerifier] | None:
         require_aud=_env_flag("REQUIRE_AUD"),
         require_iss=_env_flag("REQUIRE_ISS"),
         cache_ttl_seconds=_cache_ttl(),
+        identity_claim=(_env("IDENTITY_CLAIM") or "auto"),
     )
     return settings, verifier

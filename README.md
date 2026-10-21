@@ -32,7 +32,7 @@ ERPipe is the managed Odoo MCP gateway from the maintainer of [`erpipe-org/mcp-o
 > **Want ChatGPT / Claude on a stable remote URL without running a process?**  
 > **[ERPipe](https://erpipe.com/)** is the hosted product from the same author — free v1 public beta, live in production.  
 > Sign up → add HTTPS Odoo instance(s) → connect once to `https://mcp.erpipe.com/mcp` (workspace OAuth, multi-instance, gated writes, audit dashboard).  
-> This repo stays the **local / self-host Python server** (full 41-tool surface, stdio, Docker). TypeScript building blocks: [`erpipe`](https://github.com/erpipe-org/erpipe).
+> This repo stays the **local / self-host Python server** (full 47-tool surface, stdio, Docker). TypeScript building blocks: [`erpipe`](https://github.com/erpipe-org/erpipe).
 
 | | **This repo (`odoo-mcp`)** | **[ERPipe hosted](https://erpipe.com/)** |
 |--|--|--|
@@ -40,7 +40,7 @@ ERPipe is the managed Odoo MCP gateway from the maintainer of [`erpipe-org/mcp-o
 | Install | `uvx odoo-mcp --setup` | Sign up at [erpipe.com](https://erpipe.com/) |
 | MCP URL | stdio or local HTTP | `https://mcp.erpipe.com/mcp` |
 | Clients | Claude Code, Cursor, local agents | **ChatGPT** (primary), Claude, Cursor, any remote MCP client |
-| Tool surface | **41 tools** + 11 prompts (full local pack) | **43 tools** + 7 prompts (workspace multi-instance + governance; [catalog](https://erpipe.com/tools)) |
+| Tool surface | **47 tools** + 11 prompts (including the opt-in Ngoc Viet read-only pack) | **43 tools** + 7 prompts (workspace multi-instance + governance; [catalog](https://erpipe.com/tools)) |
 | Multi-instance | Config file / env on your machine | Dashboard + explicit `instance` key per tool |
 | Writes | Env gate + approval tokens (+ optional MCP elicitation) | Default OFF · HITL inbox · journal · field policy |
 | Audit | Optional JSONL file | Dashboard + D1 audit trail |
@@ -64,7 +64,7 @@ Once configured (see [Setup](#setup)), ask your agent things like:
 
 | Capability | What it gives you |
 | --- | --- |
-| 41 MCP tools | Read records and attachments, aggregate server-side, post chatter, inspect schema, build domains, scan addons, diagnose calls and upgrade logs, check data quality, access rules, resolve model renames, validate writes, and fan out across instances. |
+| 47 MCP tools | Read records and attachments, aggregate server-side, post chatter, inspect schema, build domains, scan addons, diagnose calls and upgrade logs, check data quality, access rules, resolve model renames, validate writes, fan out across instances, and expose the opt-in Ngoc Viet read-only pack. |
 | Field-level ACL | Opt-in per-instance, per-model field allow/deny enforced on every read path (records, aggregates, knowledge index, resources). First open-source Odoo MCP with it. See [docs/field-acl.md](docs/field-acl.md). |
 | Cross-instance queries | Read-only fan-out across many client DBs with merged, attributed, partial-failure-tolerant results — no warehouse, no sync. See [docs/partner-playbook.md](docs/partner-playbook.md). |
 | Workflow prompts | 11 prompts including 6 end-to-end business workflows (invoice approval, PO match, onboarding, expense review, month-end close, pre-migration data quality) that route writes through the gate. |
@@ -278,7 +278,7 @@ Optional environment variables:
 | `ODOO_MCP_AUTH_REQUIRE_ISS` | `0` | Truthy → reject introspection responses without an `iss` claim. A present `iss` must always match `ODOO_MCP_AUTH_ISSUER_URL` (mix-up attack hardening). |
 | `ODOO_MCP_AUTH_CACHE_TTL` | `60` | Seconds to cache introspection verdicts (`0` disables). Bounds both AS load and revocation lag. |
 | `ODOO_MCP_PLUGINS` | unset | CSV entry-point names to load as third-party tool plugins (group `odoo_mcp.tools`). Installation alone activates nothing; failures are isolated and reported in `health_check`. See [docs/plugins.md](docs/plugins.md). |
-| `ODOO_MCP_TOOLS_INCLUDE` / `_EXCLUDE` | unset | CSV fnmatch globs trimming the registered tool surface per deployment (small agents drown in 41 tools). Removed names listed in `health_check`. |
+| `ODOO_MCP_TOOLS_INCLUDE` / `_EXCLUDE` | unset | CSV fnmatch globs trimming the registered tool surface per deployment (small agents can struggle with a large tool set). Removed names listed in `health_check`. |
 | `ODOO_MCP_INSTRUCTIONS_FILE` | unset | Plain-text file appended to the server-level MCP `instructions` every client receives — deployment-specific guidance (fiscal-year rules, naming conventions) without touching tool descriptions. |
 
 You can also use `odoo_config.json`:
@@ -358,7 +358,7 @@ odoo-mcp --health
 
 ## MCP Tools
 
-41 tools grouped by use case. Each tool name is a single-purpose handle the agent can call. Tools that talk to Odoo accept an optional `instance` parameter when multiple instances are configured (see [Multiple Odoo instances](#multiple-odoo-instances)).
+47 tools grouped by use case. Each tool name is a single-purpose handle the agent can call. Tools that talk to Odoo accept an optional `instance` parameter when multiple instances are configured (see [Multiple Odoo instances](#multiple-odoo-instances)).
 
 ### Read & Discover (11)
 

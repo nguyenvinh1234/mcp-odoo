@@ -48,6 +48,7 @@ class TaskRecord:
 
     task_id: str
     name: str
+    submitted_order: int = 0
     status: str = STATUS_PENDING
     created_at: float = field(default_factory=time.time)
     started_at: Optional[float] = None
@@ -93,6 +94,7 @@ class AsyncTaskManager:
         self._executor: Optional[ThreadPoolExecutor] = None
         self._tasks: Dict[str, TaskRecord] = {}
         self._lock = threading.Lock()
+        self._submitted_count = 0
 
     def _ensure_executor(self) -> ThreadPoolExecutor:
         if self._executor is None:
@@ -144,7 +146,10 @@ class AsyncTaskManager:
                     ),
                 }
             task_id = uuid.uuid4().hex[:12]
-            record = TaskRecord(task_id=task_id, name=name)
+            self._submitted_count += 1
+            record = TaskRecord(
+                task_id=task_id, name=name, submitted_order=self._submitted_count
+            )
             self._tasks[task_id] = record
 
         def _run() -> None:
@@ -216,7 +221,9 @@ class AsyncTaskManager:
         with self._lock:
             self._purge_locked()
             records = sorted(
-                self._tasks.values(), key=lambda item: item.created_at, reverse=True
+                self._tasks.values(),
+                key=lambda item: item.submitted_order,
+                reverse=True,
             )
             return [record.snapshot(include_result=False) for record in records]
 

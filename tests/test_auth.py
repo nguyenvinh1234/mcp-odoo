@@ -97,6 +97,33 @@ def test_verify_token_sends_client_credentials_when_configured():
     assert token.client_id == "user-7"
 
 
+def test_verify_token_can_use_preferred_username_identity():
+    payload = {
+        "active": True,
+        "preferred_username": "staging-crm-ai",
+        "aud": RESOURCE,
+    }
+    token = asyncio.run(
+        _verifier(
+            lambda req: _json_response(payload),
+            identity_claim="preferred_username",
+        ).verify_token("tok-user")
+    )
+    assert token is not None
+    assert token.client_id == "staging-crm-ai"
+
+
+def test_verify_token_can_use_username_identity():
+    payload = {"active": True, "username": "staging-full-ai", "aud": RESOURCE}
+    token = asyncio.run(
+        _verifier(
+            lambda req: _json_response(payload), identity_claim="username"
+        ).verify_token("tok-username")
+    )
+    assert token is not None
+    assert token.client_id == "staging-full-ai"
+
+
 def test_build_auth_returns_none_when_unconfigured(monkeypatch):
     for key in list(auth.os.environ):
         if key.startswith(auth.AUTH_ENV_PREFIX):
@@ -111,6 +138,23 @@ def test_build_auth_rejects_partial_configuration(monkeypatch):
     monkeypatch.delenv("ODOO_MCP_AUTH_RESOURCE_URL", raising=False)
     with pytest.raises(ValueError, match="Incomplete OAuth configuration"):
         auth.build_auth()
+
+
+def test_auth_secret_can_be_loaded_from_file(monkeypatch, tmp_path):
+    secret_file = tmp_path / "oauth-secret"
+    secret_file.write_text("file-secret\n", encoding="utf-8")
+    monkeypatch.delenv("ODOO_MCP_AUTH_CLIENT_SECRET", raising=False)
+    monkeypatch.setenv("ODOO_MCP_AUTH_CLIENT_SECRET_FILE", str(secret_file))
+    assert auth._env("CLIENT_SECRET") == "file-secret"
+
+
+def test_auth_value_and_file_together_are_rejected(monkeypatch, tmp_path):
+    secret_file = tmp_path / "oauth-secret"
+    secret_file.write_text("file-secret", encoding="utf-8")
+    monkeypatch.setenv("ODOO_MCP_AUTH_CLIENT_SECRET", "inline-secret")
+    monkeypatch.setenv("ODOO_MCP_AUTH_CLIENT_SECRET_FILE", str(secret_file))
+    with pytest.raises(ValueError, match="only one"):
+        auth._env("CLIENT_SECRET")
 
 
 def test_build_auth_builds_settings_and_verifier(monkeypatch):

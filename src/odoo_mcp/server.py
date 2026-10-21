@@ -76,6 +76,8 @@ from . import tools_knowledge
 from . import tools_accounting
 from . import tools_cross_instance
 from . import tools_async
+from . import tools_ngv
+from . import tools_ngv_write
 from . import prompts
 from . import prompts_workflows
 

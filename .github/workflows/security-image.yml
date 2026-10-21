@@ -1,0 +1,40 @@
+name: Container security
+
+on:
+  pull_request:
+    paths:
+      - "Dockerfile"
+      - "pyproject.toml"
+      - "uv.lock"
+      - "src/**"
+      - ".github/workflows/security-image.yml"
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  trivy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build runtime image
+        run: docker build --pull --tag ngv-odoo-mcp:ci .
+
+      - name: Export image without exposing the Docker socket
+        run: docker save --output ngv-odoo-mcp.tar ngv-odoo-mcp:ci
+
+      - name: Fail on Critical or High vulnerabilities
+        run: >-
+          docker run --rm
+          --volume "$PWD:/scan:ro"
+          aquasec/trivy:0.76.0@sha256:2416d1f74045b57274df1a340eee6b510cacd73c66a6ccb8da092b117eb7d222
+          image --input /scan/ngv-odoo-mcp.tar
+          --scanners vuln
+          --severity CRITICAL,HIGH
+          --exit-code 1
+          --no-progress

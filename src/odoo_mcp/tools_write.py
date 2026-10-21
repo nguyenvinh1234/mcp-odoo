@@ -75,6 +75,10 @@ def _read_attachment_source_file(path: Path, cap: int) -> bytes:
     always the bytes actually returned, not a stale ``stat()`` from an
     earlier, possibly-swapped file.
     """
+    # Windows has no O_NOFOLLOW. Reject a link immediately before opening;
+    # Linux still gets the atomic O_NOFOLLOW protection below.
+    if path.is_symlink():
+        raise ValueError(f"{path} does not exist or is not a regular file")
     try:
         fd = os.open(str(path), os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
     except OSError as exc:

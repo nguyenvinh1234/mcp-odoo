@@ -4,6 +4,37 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Added the opt-in `ngocviet-readonly` security profile with per-client OAuth
+  subject mapping, fixed CRM/customer/quotation/product tools, redacted query
+  audit events, and explicit Odoo 16 XML-RPC / Odoo 20 JSON-2 adapters.
+- Added an isolated staging Compose stack, Vietnamese operations guide,
+  security review, business-function matrix, and acceptance-test report.
+- Added a resource-limited Odoo 16 staging fixture, two read-only ACL identities,
+  a private RFC 7662 test introspection service, and an automated MCP E2E smoke test.
+
+### Fixed
+
+- MCP Inspector smoke now distinguishes the registered 47-tool full surface
+  from the exact six-tool `ngocviet-readonly` surface. The restricted profile
+  fails if any generic or write-capable tool remains visible; calls also still
+  require its client policy and OAuth scopes.
+
+### Security
+
+- The Ngoc Viet profile removes generic tools, resources, templates, and
+  prompts; rejects write, unknown-method, and direct-chatter escape hatches;
+  and requires OAuth for every HTTP transport.
+- Docker now runs the gateway as UID/GID 10001 instead of root. OAuth client
+  secrets may be loaded from a mounted `*_FILE` secret.
+- Read-only business tools now return bounded error envelopes instead of raw
+  exception messages that could expose internal connection details.
+- Denied query audit events retain the authenticated subject without exposing
+  bearer tokens or exception details.
+- Refreshed the lockfile to patched runtime dependencies; `pip-audit` reported
+  no known vulnerabilities on 2026-10-19.
+
 ## [1.3.2] - 2026-08-19
 
 ### Changed

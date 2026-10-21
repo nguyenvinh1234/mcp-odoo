@@ -6,11 +6,11 @@ from odoo_mcp import audit
 def test_record_write_event_disabled_without_env(monkeypatch):
     monkeypatch.delenv(audit.AUDIT_LOG_ENV, raising=False)
     assert audit.record_write_event("execute", outcome="success") is False
-    assert audit.audit_posture() == {
-        "enabled": False,
-        "path": None,
-        "env": "ODOO_MCP_AUDIT_LOG",
-    }
+    posture = audit.audit_posture()
+    assert posture["enabled"] is False
+    assert posture["path"] is None
+    assert posture["env"] == "ODOO_MCP_AUDIT_LOG"
+    assert posture["file_mode"] == "0600"
 
 
 def test_record_write_event_appends_jsonl_lines(monkeypatch, tmp_path):
@@ -53,6 +53,27 @@ def test_record_write_event_fails_open_on_oserror(monkeypatch, tmp_path):
         audit.record_write_event("execute", outcome="success", model="res.partner")
         is False
     )
+
+
+def test_audit_rotates_and_retains_bounded_backups(monkeypatch, tmp_path):
+    log_path = tmp_path / "audit.jsonl"
+    monkeypatch.setenv(audit.AUDIT_LOG_ENV, str(log_path))
+    monkeypatch.setenv(audit.AUDIT_MAX_BYTES_ENV, "250")
+    monkeypatch.setenv(audit.AUDIT_BACKUP_COUNT_ENV, "2")
+
+    for index in range(12):
+        assert audit.record_gateway_event(
+            "query",
+            outcome="success",
+            client_id="staging-writer-ai",
+            tool="ngv_whoami",
+            request_id=str(index),
+        )
+
+    assert log_path.exists()
+    assert (tmp_path / "audit.jsonl.1").exists()
+    assert not (tmp_path / "audit.jsonl.3").exists()
+    assert audit.audit_posture()["backup_count"] == 2
 
 
 def test_side_effect_policy_file_merges_with_env(monkeypatch, tmp_path):

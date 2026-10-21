@@ -746,7 +746,41 @@ def mcp_env(
     return env
 
 
-def assert_tool_surface(tool_names: set[str]) -> None:
+def assert_tool_surface(
+    tool_names: set[str], *, security_profile: str | None = None
+) -> None:
+    ngv_tools = {
+        "ngv_whoami",
+        "ngv_list_leads",
+        "ngv_list_customers",
+        "ngv_list_quotations",
+        "ngv_list_products",
+        "ngv_daily_sales_summary",
+    }
+    ngv_write_tools = {
+        "ngv_prepare_customer_create",
+        "ngv_prepare_lead_update",
+        "ngv_prepare_draft_quotation",
+        "ngv_execute_approved_change",
+    }
+    if security_profile == "ngocviet-readonly":
+        if tool_names != ngv_tools:
+            raise AssertionError(
+                "Ngoc Viet read-only MCP surface must expose exactly six tools: "
+                f"{sorted(tool_names)}"
+            )
+        return
+    if security_profile == "ngocviet-staging-write":
+        expected_staging = ngv_tools | ngv_write_tools
+        if tool_names != expected_staging:
+            raise AssertionError(
+                "Ngoc Viet staging-write MCP surface must expose exactly ten tools: "
+                f"{sorted(tool_names)}"
+            )
+        return
+    if security_profile not in {None, ""}:
+        raise AssertionError(f"Unknown MCP security profile: {security_profile!r}")
+
     expected_tools = {
         "execute_method",
         "list_models",
@@ -775,7 +809,16 @@ def assert_tool_surface(tool_names: set[str]) -> None:
         "list_instances",
         "lookup_model_history",
         "read_attachment",
+        *ngv_tools,
+        *ngv_write_tools,
     }
+    # 41 historical tools plus six read and four controlled staging-write tools.
+    # Registration is visible on the default surface; the ngocviet-readonly
+    # profile is a separate, fail-closed six-tool surface checked above.
+    if len(tool_names) != 51:
+        raise AssertionError(
+            f"MCP surface did not report 51 tools: {sorted(tool_names)}"
+        )
     if not expected_tools <= tool_names:
         raise AssertionError(f"Missing MCP tools: {expected_tools - tool_names}")
 
@@ -1087,8 +1130,8 @@ async def mcp_stdio_smoke(
                 await session.call_tool("health_check", arguments={}),
                 "health_check",
             )
-            if health.get("server", {}).get("tool_count") != 41:
-                raise AssertionError(f"health_check did not report 41 tools: {health}")
+            if health.get("server", {}).get("tool_count") != 51:
+                raise AssertionError(f"health_check did not report 51 tools: {health}")
             if "chatter_direct_enabled" not in health.get("runtime", {}):
                 raise AssertionError(
                     f"health_check did not surface chatter_direct posture: {health}"
