@@ -186,6 +186,7 @@ services:
 
   gateway:
     image: ngv-odoo-mcp-staging:local
+    group_add: ["${MCP_SECRET_GID:-1000}"]
     build:
       context: ../..
       dockerfile: Dockerfile
@@ -235,6 +236,7 @@ services:
 
   gateway-write:
     image: ngv-odoo-mcp-staging:local
+    group_add: ["${MCP_SECRET_GID:-1000}"]
     restart: unless-stopped
     command: ["--transport", "streamable-http", "--host", "0.0.0.0", "--port", "8000", "--path", "/mcp", "--allow-remote-http"]
     environment:
@@ -297,6 +299,7 @@ services:
 
   smoke:
     image: ngv-odoo-mcp-staging:local
+    group_add: ["${MCP_SECRET_GID:-1000}"]
     profiles: ["test"]
     entrypoint: ["python"]
     command: ["/opt/tests/smoke_mcp.py"]
@@ -326,6 +329,7 @@ services:
 
   oauth-smoke:
     image: ngv-odoo-mcp-staging:local
+    group_add: ["${MCP_SECRET_GID:-1000}"]
     profiles: ["test"]
     entrypoint: ["python"]
     command: ["/opt/tests/oauth_smoke.py"]
@@ -357,6 +361,7 @@ services:
 
   keycloak-write-config:
     image: ngv-odoo-mcp-staging:local
+    group_add: ["${MCP_SECRET_GID:-1000}"]
     profiles: ["test"]
     entrypoint: ["python"]
     command: ["/opt/tests/configure_keycloak_write_client.py"]
@@ -381,6 +386,7 @@ services:
 
   pkce-smoke:
     image: ngv-odoo-mcp-staging:local
+    group_add: ["${MCP_SECRET_GID:-1000}"]
     profiles: ["test"]
     entrypoint: ["python"]
     command: ["/opt/tests/pkce_smoke.py"]
@@ -409,6 +415,7 @@ services:
 
   write-smoke:
     image: ngv-odoo-mcp-staging:local
+    group_add: ["${MCP_SECRET_GID:-1000}"]
     profiles: ["test"]
     entrypoint: ["python"]
     command: ["/opt/tests/smoke_write.py"]
