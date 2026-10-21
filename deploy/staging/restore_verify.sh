@@ -21,10 +21,10 @@ wait_for_db() {
 restore_once() {
   local host="$1" user="$2" password_file="$3" database="$4" dump="$5"
   export PGPASSWORD="$(cat "$password_file")"
-  if ! psql -h "$host" -U "$user" -d postgres -Atc \
+  if ! psql -w -h "$host" -U "$user" -d postgres -Atc \
     "select 1 from pg_database where datname='${database}'" | grep -qx 1; then
-    createdb -h "$host" -U "$user" "$database"
-    pg_restore --exit-on-error --no-owner --no-privileges \
+    createdb -w -h "$host" -U "$user" "$database"
+    pg_restore -w --exit-on-error --no-owner --no-privileges \
       -h "$host" -U "$user" -d "$database" "$dump"
   fi
 }
@@ -37,15 +37,15 @@ restore_once restore-keycloak-db keycloak /run/secrets/keycloak_db_password \
   "$KEYCLOAK_DB" /backups/keycloak.dump
 
 export PGPASSWORD="$(cat /run/secrets/postgres_password)"
-ODOO_TABLES="$(psql -h restore-odoo-db -U odoo -d "$ODOO_DB" -Atc \
+ODOO_TABLES="$(psql -w -h restore-odoo-db -U odoo -d "$ODOO_DB" -Atc \
   "select count(*) from pg_tables where schemaname='public'")"
-ODOO_REGISTRY="$(psql -h restore-odoo-db -U odoo -d "$ODOO_DB" -Atc \
+ODOO_REGISTRY="$(psql -w -h restore-odoo-db -U odoo -d "$ODOO_DB" -Atc \
   "select count(*) from ir_module_module where state='installed'")"
 
 export PGPASSWORD="$(cat /run/secrets/keycloak_db_password)"
-KEYCLOAK_TABLES="$(psql -h restore-keycloak-db -U keycloak -d "$KEYCLOAK_DB" -Atc \
+KEYCLOAK_TABLES="$(psql -w -h restore-keycloak-db -U keycloak -d "$KEYCLOAK_DB" -Atc \
   "select count(*) from pg_tables where schemaname='public'")"
-KEYCLOAK_REALMS="$(psql -h restore-keycloak-db -U keycloak -d "$KEYCLOAK_DB" -Atc \
+KEYCLOAK_REALMS="$(psql -w -h restore-keycloak-db -U keycloak -d "$KEYCLOAK_DB" -Atc \
   "select count(*) from realm")"
 
 test "$ODOO_TABLES" -gt 0

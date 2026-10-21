@@ -3,6 +3,7 @@ name: ngv-odoo-mcp-restore-verify
 services:
   restore-odoo-db:
     image: postgres:15-alpine
+    group_add: ["${MCP_SECRET_GID:-1000}"]
     restart: "no"
     environment:
       POSTGRES_DB: postgres
@@ -23,6 +24,7 @@ services:
 
   restore-keycloak-db:
     image: postgres:17-alpine
+    group_add: ["${MCP_SECRET_GID:-1000}"]
     restart: "no"
     environment:
       POSTGRES_DB: postgres
@@ -43,12 +45,13 @@ services:
 
   restore-verify:
     image: postgres:17-alpine
+    group_add: ["${MCP_SECRET_GID:-1000}"]
     restart: "no"
     entrypoint: ["/bin/sh", "/opt/restore/restore_verify.sh"]
     secrets: [postgres_password, keycloak_db_password]
     volumes:
-      - ${STAGING_BACKUP_DIR:-/home/ngocviet/staging/backups/mcp-odoo/20261020-pre-write}:/backups:ro
-      - ./restore_verify.sh:/opt/restore/restore_verify.sh:ro
+      - ${STAGING_BACKUP_DIR:-/home/ngocviet/staging/backups/mcp-odoo/20261020-pre-write}:/backups:ro,z
+      - ./restore_verify.sh:/opt/restore/restore_verify.sh:ro,z
     networks: [restore-backend]
     depends_on:
       restore-odoo-db: {condition: service_healthy}

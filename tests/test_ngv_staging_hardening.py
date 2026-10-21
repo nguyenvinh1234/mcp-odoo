@@ -46,3 +46,20 @@ def test_pkce_client_is_public_s256_without_password_grant():
     assert '"standardFlowEnabled": True' in section
     assert '"directAccessGrantsEnabled": False' in section
     assert '"pkce.code.challenge.method": "S256"' in section
+
+
+def test_restore_drill_uses_dedicated_project_and_keeps_volumes():
+    runner = (ROOT / "deploy/staging/run_restore_verify.sh").read_text(
+        encoding="utf-8"
+    )
+    assert "-p ngv-odoo-mcp-restore-verify" in runner
+    assert "--remove-orphans" not in runner
+    assert " down" not in runner
+    assert "down -v" not in runner
+    assert "down --volumes" not in runner
+
+    compose = (ROOT / "deploy/staging/restore-verify.yml").read_text(
+        encoding="utf-8"
+    )
+    assert "restore-backend: {internal: true}" in compose
+    assert "ports:" not in compose
