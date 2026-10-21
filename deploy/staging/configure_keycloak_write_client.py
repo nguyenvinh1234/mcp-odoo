@@ -140,6 +140,7 @@ def main() -> None:
             "protocolMapper": "oidc-audience-mapper",
             "consentRequired": False,
             "config": {
+                "included.client.audience": "ngv-odoo-mcp-staging",
                 "included.custom.audience": WRITE_RESOURCE,
                 "id.token.claim": "false",
                 "access.token.claim": "true",

@@ -213,6 +213,7 @@ def _realm_payload(
                         "protocolMapper": "oidc-audience-mapper",
                         "consentRequired": False,
                         "config": {
+                            "included.client.audience": "ngv-odoo-mcp-staging",
                             "included.custom.audience": write_resource_url,
                             "id.token.claim": "false",
                             "access.token.claim": "true",
