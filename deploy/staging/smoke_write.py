@@ -236,9 +236,21 @@ async def main() -> None:
     writer_token = await _oauth_token(
         "staging-writer-ai", "keycloak_writer_password", WRITE_SCOPES
     )
+    read_only_writer_token = await _oauth_token(
+        "staging-writer-ai", "keycloak_writer_password", READ_SCOPES
+    )
     full_token = await _oauth_token(
         "staging-full-ai", "keycloak_full_password", WRITE_SCOPES
     )
+    async with httpx2.AsyncClient(timeout=10) as client:
+        insufficient_scope = await client.get(
+            URL,
+            headers={
+                "Authorization": f"Bearer {read_only_writer_token}",
+                "Accept": "text/event-stream",
+            },
+        )
+    assert insufficient_scope.status_code == 403
 
     tools, reads = await _mcp_calls(
         writer_token,
@@ -379,12 +391,17 @@ async def main() -> None:
     assert revoked_status == 401
     audit_lines = audit_path.read_text(encoding="utf-8").splitlines()[audit_before:]
     audit_text = "\n".join(audit_lines)
-    assert writer_token not in audit_text and full_token not in audit_text
+    assert (
+        writer_token not in audit_text
+        and read_only_writer_token not in audit_text
+        and full_token not in audit_text
+    )
     assert customer_email not in audit_text and customer_name not in audit_text
     audit_rows = [json.loads(line) for line in audit_lines]
 
     report = {
         "mcp_unauthenticated_status": unauthenticated.status_code,
+        "insufficient_scope_status": insufficient_scope.status_code,
         "revoked_token_status": revoked_status,
         "tool_count": len(tools),
         "writer_odoo_user_id": whoami["record_ids"][0],
