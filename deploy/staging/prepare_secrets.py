@@ -203,7 +203,6 @@ def _realm_payload(
                     "post.logout.redirect.uris": "http://127.0.0.1:8767/callback",
                 },
                 "defaultClientScopes": [
-                    "profile",
                     *scopes,
                 ],
                 "optionalClientScopes": [],

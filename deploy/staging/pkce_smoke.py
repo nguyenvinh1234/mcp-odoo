@@ -23,7 +23,7 @@ RESOURCE_CLIENT_ID = "ngv-odoo-mcp-staging"
 REDIRECT_URI = os.environ.get(
     "MCP_WRITE_OAUTH_REDIRECT_URI", "http://127.0.0.1:8767/callback"
 )
-SCOPES = "openid profile odoo.read odoo.crm.read odoo.customers.read odoo.sales.read odoo.products.read odoo.write.staging"
+SCOPES = "openid odoo.read odoo.crm.read odoo.customers.read odoo.sales.read odoo.products.read odoo.write.staging"
 
 
 def _secret(name: str) -> str:

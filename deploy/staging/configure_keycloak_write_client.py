@@ -17,7 +17,6 @@ REDIRECT_URI = os.environ.get(
 )
 WRITE_RESOURCE = os.environ["MCP_WRITE_RESOURCE_URL"]
 SCOPES = [
-    "profile",
     "odoo.read",
     "odoo.crm.read",
     "odoo.customers.read",
@@ -92,7 +91,7 @@ def main() -> None:
         scope_ids = {row["name"]: row["id"] for row in scopes_response.json()}
         created_scopes: list[str] = []
         for name in SCOPES:
-            if name == "profile" or name in scope_ids:
+            if name in scope_ids:
                 continue
             created_scope = client.post(
                 f"{base}/client-scopes",
