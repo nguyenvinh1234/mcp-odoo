@@ -208,7 +208,10 @@ class NgvHttpGuardMiddleware:
             if not sent_request:
                 sent_request = True
                 return {"type": "http.request", "body": bytes(body), "more_body": False}
-            return {"type": "http.disconnect"}
+            # Streamable HTTP keeps listening for a real client disconnect while
+            # it emits the SSE response.  A synthetic disconnect here races the
+            # response and can terminate the MCP session before initialization.
+            return await receive()
 
         response_started = False
 
