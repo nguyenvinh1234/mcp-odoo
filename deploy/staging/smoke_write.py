@@ -185,9 +185,9 @@ def _rollback_probe(suffix: str) -> bool:
     payload = {
         "name": name,
         "company_type": "company",
-        "email": None,
-        "phone": None,
-        "vat": None,
+        "email": "",
+        "phone": "",
+        "vat": "",
     }
     try:
         _rpc_call("customer.create", request_key, payload, rollback=True)
@@ -206,9 +206,9 @@ def _concurrency_probe(suffix: str) -> dict[str, Any]:
     payload = {
         "name": name,
         "company_type": "company",
-        "email": None,
-        "phone": None,
-        "vat": None,
+        "email": "",
+        "phone": "",
+        "vat": "",
     }
     with ThreadPoolExecutor(max_workers=2) as executor:
         results = list(
