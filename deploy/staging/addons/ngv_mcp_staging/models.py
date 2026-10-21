@@ -8,50 +8,49 @@ HEX_64 = re.compile(r"^[0-9a-f]{64}$")
 CONTROLLED_CONTEXT = "ngv_mcp_controlled_write"
 
 
-class ControlledWriteMixin:
-    def _check_mcp_controlled_write(self):
-        if self.env.user.has_group(
-            "ngv_mcp_staging.group_mcp_staging_writer"
-        ) and not self.env.context.get(CONTROLLED_CONTEXT):
-            raise AccessError(_("Use the approval-gated MCP staging workflow."))
+def _check_mcp_controlled_write(recordset):
+    if recordset.env.user.has_group(
+        "ngv_mcp_staging.group_mcp_staging_writer"
+    ) and not recordset.env.context.get(CONTROLLED_CONTEXT):
+        raise AccessError(_("Use the approval-gated MCP staging workflow."))
 
 
-class ResPartner(models.Model, ControlledWriteMixin):
+class ResPartner(models.Model):
     _inherit = "res.partner"
 
     @api.model_create_multi
     def create(self, vals_list):
-        self._check_mcp_controlled_write()
+        _check_mcp_controlled_write(self)
         return super().create(vals_list)
 
     def write(self, vals):
-        self._check_mcp_controlled_write()
+        _check_mcp_controlled_write(self)
         return super().write(vals)
 
 
-class CrmLead(models.Model, ControlledWriteMixin):
+class CrmLead(models.Model):
     _inherit = "crm.lead"
 
     def write(self, vals):
-        self._check_mcp_controlled_write()
+        _check_mcp_controlled_write(self)
         return super().write(vals)
 
 
-class SaleOrder(models.Model, ControlledWriteMixin):
+class SaleOrder(models.Model):
     _inherit = "sale.order"
 
     @api.model_create_multi
     def create(self, vals_list):
-        self._check_mcp_controlled_write()
+        _check_mcp_controlled_write(self)
         return super().create(vals_list)
 
 
-class SaleOrderLine(models.Model, ControlledWriteMixin):
+class SaleOrderLine(models.Model):
     _inherit = "sale.order.line"
 
     @api.model_create_multi
     def create(self, vals_list):
-        self._check_mcp_controlled_write()
+        _check_mcp_controlled_write(self)
         return super().create(vals_list)
 
 
