@@ -10,11 +10,12 @@ import os
 import sys
 import time
 import traceback
+from typing import Any
 
 from mcp.server.transport_security import TransportSecuritySettings
 
 from .auth import auth_configured, build_auth
-from .ngv_policy import ngv_profile_enabled
+from .ngv_policy import ngv_profile_enabled, ngv_staging_write_profile_enabled
 from .server import mcp
 
 SUPPORTED_MCP_TRANSPORTS = {"stdio", "streamable-http", "sse"}
@@ -144,6 +145,14 @@ def parse_csv_env(value: str | None) -> list[str]:
     return [item.strip() for item in value.split(",") if item.strip()]
 
 
+def positive_int_env(name: str, default: int) -> int:
+    """Read a positive integer environment setting with a safe fallback."""
+    try:
+        return max(1, int(os.environ.get(name, str(default))))
+    except ValueError:
+        return default
+
+
 def is_secret_env_key(key: str) -> bool:
     """Keep secrets out of startup logs."""
     upper_key = key.upper()
@@ -262,6 +271,13 @@ def configure_mcp_runtime(args: argparse.Namespace) -> dict[str, object]:
     }
     if args.transport == "streamable-http":
         options["streamable_http_path"] = args.path
+        options["max_request_body_size"] = positive_int_env(
+            "ODOO_MCP_NGV_HTTP_MAX_BODY_BYTES", 4 * 1024 * 1024
+        )
+        options["session_idle_timeout"] = positive_int_env(
+            "ODOO_MCP_HTTP_SESSION_IDLE_SECONDS", 300
+        )
+        options["max_sessions"] = positive_int_env("ODOO_MCP_HTTP_MAX_SESSIONS", 128)
     setattr(
         mcp,
         "_odoo_runtime",
@@ -322,6 +338,41 @@ def health_payload(args: argparse.Namespace) -> dict[str, object]:
     }
 
 
+def run_guarded_write_http(runtime_options: dict[str, object]) -> None:
+    """Run the staging write endpoint with authenticated HTTP guardrails."""
+    import anyio
+    import uvicorn
+    from starlette.middleware import Middleware
+
+    from .ngv_http_guard import NgvHttpGuardMiddleware
+
+    options: dict[str, Any] = dict(runtime_options)
+    host = str(options.pop("host"))
+    port_value = options.pop("port")
+    if not isinstance(port_value, int):
+        raise ValueError("MCP HTTP port must be an integer")
+    port = port_value
+    path = str(options.get("streamable_http_path", "/mcp"))
+
+    async def serve() -> None:
+        app = mcp.streamable_http_app(host=host, **options)
+        # Append so AuthenticationMiddleware and AuthContextMiddleware remain
+        # outside this guard; get_access_token() therefore exposes the verified
+        # OAuth subject without decoding an untrusted JWT locally.
+        app.user_middleware.append(
+            Middleware(NgvHttpGuardMiddleware, path=path)
+        )
+        config = uvicorn.Config(
+            app,
+            host=host,
+            port=port,
+            log_level=mcp.settings.log_level.lower(),
+        )
+        await uvicorn.Server(config).serve()
+
+    anyio.run(serve)
+
+
 def main() -> int:
     """
     Run the MCP server
@@ -354,7 +405,10 @@ def main() -> int:
             if args.transport == "streamable-http":
                 print(f"  Path: {args.path}", file=sys.stderr)
         sys.stderr.flush()
-        mcp.run(transport=args.transport, **runtime_options)
+        if args.transport == "streamable-http" and ngv_staging_write_profile_enabled():
+            run_guarded_write_http(runtime_options)
+        else:
+            mcp.run(transport=args.transport, **runtime_options)
 
         print("MCP server stopped normally", file=sys.stderr)
         return 0

@@ -1,0 +1,73 @@
+name: ngv-odoo-mcp-restore-verify
+
+services:
+  restore-odoo-db:
+    image: postgres:15-alpine
+    restart: "no"
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: odoo
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets: [postgres_password]
+    volumes: [restore-odoo-db:/var/lib/postgresql/data]
+    networks: [restore-backend]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U odoo -d postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 512m
+    pids_limit: 128
+    cpus: 0.5
+
+  restore-keycloak-db:
+    image: postgres:17-alpine
+    restart: "no"
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD_FILE: /run/secrets/keycloak_db_password
+    secrets: [keycloak_db_password]
+    volumes: [restore-keycloak-db:/var/lib/postgresql/data]
+    networks: [restore-backend]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keycloak -d postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 512m
+    pids_limit: 128
+    cpus: 0.5
+
+  restore-verify:
+    image: postgres:17-alpine
+    restart: "no"
+    entrypoint: ["/bin/sh", "/opt/restore/restore_verify.sh"]
+    secrets: [postgres_password, keycloak_db_password]
+    volumes:
+      - ${STAGING_BACKUP_DIR:-/home/ngocviet/staging/backups/mcp-odoo/20261020-pre-write}:/backups:ro
+      - ./restore_verify.sh:/opt/restore/restore_verify.sh:ro
+    networks: [restore-backend]
+    depends_on:
+      restore-odoo-db: {condition: service_healthy}
+      restore-keycloak-db: {condition: service_healthy}
+    read_only: true
+    tmpfs: ["/tmp:size=32m,mode=1777"]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 256m
+    pids_limit: 64
+    cpus: 0.5
+
+networks:
+  restore-backend: {internal: true}
+
+volumes:
+  restore-odoo-db: {}
+  restore-keycloak-db: {}
+
+secrets:
+  postgres_password: {file: ./secrets/postgres_password.txt}
+  keycloak_db_password: {file: ./secrets/keycloak_db_password.txt}

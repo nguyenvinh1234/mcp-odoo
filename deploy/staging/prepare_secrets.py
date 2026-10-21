@@ -183,7 +183,45 @@ def _realm_payload(
                         },
                     },
                 ],
-            }
+            },
+            {
+                "clientId": "ngv-odoo-mcp-staging-write",
+                "name": "Ngoc Viet Odoo MCP staging write PKCE",
+                "enabled": True,
+                "publicClient": True,
+                "standardFlowEnabled": True,
+                "implicitFlowEnabled": False,
+                "directAccessGrantsEnabled": False,
+                "serviceAccountsEnabled": False,
+                "authorizationServicesEnabled": False,
+                "fullScopeAllowed": False,
+                "consentRequired": False,
+                "redirectUris": ["http://127.0.0.1:8767/callback"],
+                "webOrigins": [],
+                "attributes": {
+                    "pkce.code.challenge.method": "S256",
+                    "post.logout.redirect.uris": "http://127.0.0.1:8767/callback",
+                },
+                "defaultClientScopes": [
+                    "profile",
+                    *scopes,
+                ],
+                "optionalClientScopes": [],
+                "protocolMappers": [
+                    {
+                        "name": "mcp-write-resource-url-audience",
+                        "protocol": "openid-connect",
+                        "protocolMapper": "oidc-audience-mapper",
+                        "consentRequired": False,
+                        "config": {
+                            "included.custom.audience": write_resource_url,
+                            "id.token.claim": "false",
+                            "access.token.claim": "true",
+                            "introspection.token.claim": "true",
+                        },
+                    }
+                ],
+            },
         ],
         "users": [
             {
