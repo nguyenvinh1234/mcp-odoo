@@ -134,35 +134,47 @@ def main() -> None:
                 f"Required scopes were not assigned to the write client: {missing_assigned}"
             )
 
-        mapper = {
-            "name": "mcp-write-resource-url-audience",
-            "protocol": "openid-connect",
-            "protocolMapper": "oidc-audience-mapper",
-            "consentRequired": False,
-            "config": {
-                "included.client.audience": "ngv-odoo-mcp-staging",
-                "included.custom.audience": WRITE_RESOURCE,
-                "id.token.claim": "false",
-                "access.token.claim": "true",
-                "introspection.token.claim": "true",
+        mappers = [
+            {
+                "name": "mcp-write-resource-url-audience",
+                "protocol": "openid-connect",
+                "protocolMapper": "oidc-audience-mapper",
+                "consentRequired": False,
+                "config": {
+                    "included.custom.audience": WRITE_RESOURCE,
+                    "id.token.claim": "false",
+                    "access.token.claim": "true",
+                    "introspection.token.claim": "true",
+                },
             },
-        }
+            {
+                "name": "mcp-write-resource-client-audience",
+                "protocol": "openid-connect",
+                "protocolMapper": "oidc-audience-mapper",
+                "consentRequired": False,
+                "config": {
+                    "included.client.audience": "ngv-odoo-mcp-staging",
+                    "id.token.claim": "false",
+                    "access.token.claim": "true",
+                    "introspection.token.claim": "true",
+                },
+            },
+        ]
         mapper_url = f"{base}/clients/{client_uuid}/protocol-mappers/models"
         existing = client.get(mapper_url, headers=headers)
         existing.raise_for_status()
-        matched = next(
-            (row for row in existing.json() if row.get("name") == mapper["name"]),
-            None,
-        )
-        if matched:
-            response = client.put(
-                f"{mapper_url}/{matched['id']}",
-                json={**mapper, "id": matched["id"]},
-                headers=headers,
-            )
-        else:
-            response = client.post(mapper_url, json=mapper, headers=headers)
-        response.raise_for_status()
+        existing_by_name = {row.get("name"): row for row in existing.json()}
+        for mapper in mappers:
+            matched = existing_by_name.get(mapper["name"])
+            if matched:
+                response = client.put(
+                    f"{mapper_url}/{matched['id']}",
+                    json={**mapper, "id": matched["id"]},
+                    headers=headers,
+                )
+            else:
+                response = client.post(mapper_url, json=mapper, headers=headers)
+            response.raise_for_status()
 
     print(
         json.dumps(
