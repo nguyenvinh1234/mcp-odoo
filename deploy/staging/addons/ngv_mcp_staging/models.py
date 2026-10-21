@@ -97,6 +97,13 @@ class NgvMcpRequest(models.Model):
     def execute_request(
         self, action, request_key, payload_hash, client_digest, payload
     ):
+        # Odoo uses repeatable-read transactions. Acquire a table-level writer
+        # lock before the first ORM read so a waiter receives a fresh snapshot
+        # after the prior request commits. This serializes only the low-volume
+        # MCP write receipt workflow, not CRM, partner, or sale reads.
+        self.env.cr.execute(
+            "LOCK TABLE ngv_mcp_request IN SHARE ROW EXCLUSIVE MODE"
+        )
         if not self.env.user.has_group("ngv_mcp_staging.group_mcp_staging_writer"):
             raise AccessError(_("Controlled staging writer access is required."))
         if action not in dict(self._fields["action"].selection):
@@ -111,11 +118,6 @@ class NgvMcpRequest(models.Model):
         if not isinstance(payload, dict):
             raise ValidationError(_("Write payload must be an object."))
 
-        # Serialize the same idempotency key across concurrent workers. The
-        # lock ends with the transaction and never escapes this staging addon.
-        self.env.cr.execute(
-            "SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))", [request_key]
-        )
         existing = self.search([("request_key", "=", request_key)], limit=1)
         if existing:
             if (
