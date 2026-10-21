@@ -1,5 +1,9 @@
 # Báo cáo hoàn thiện Odoo AI Gateway — 21-10-2026
 
+> Cập nhật P0 mới nhất và bằng chứng CRM write staging thực tế nằm tại
+> `docs/BAO_CAO_CHAT_LUONG_CRM_WRITE_STAGING_2026-10-21.md`. Báo cáo đó thay
+> thế các commit, record ID, số test và số liệu tài nguyên cũ trong tài liệu này.
+
 Repository: `https://github.com/nguyenvinh1234/mcp-odoo`  
 PR: `https://github.com/nguyenvinh1234/mcp-odoo/pull/1`  
 Branch: `codex/odoo16-readonly-gateway`  

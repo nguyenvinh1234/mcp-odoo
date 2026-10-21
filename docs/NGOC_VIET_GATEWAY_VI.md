@@ -71,10 +71,16 @@ docker compose --profile test --env-file deploy/staging/.env \
   -f deploy/staging/compose.yml run --rm smoke
 ```
 
-Compose chỉ publish gateway lên `127.0.0.1`; Odoo và PostgreSQL không publish
-host port. Đưa HTTPS reverse proxy đã xác thực ở cùng máy lên trước port này.
-Gateway chạy UID/GID `10001`, filesystem chỉ đọc, drop toàn bộ Linux capabilities,
-không mount Docker socket. Audit nằm ở volume `gateway-audit`.
+Compose chỉ publish readonly gateway lên `127.0.0.1`. Write gateway staging
+không publish host port và chỉ nối mạng backend internal; Odoo và PostgreSQL
+không publish host port. Chỉ thêm reverse proxy write sau một phê duyệt riêng.
+Gateway chạy UID/GID `10001`, filesystem chỉ đọc, drop toàn bộ Linux
+capabilities, không mount Docker socket. Audit dùng volume riêng cho readonly
+và write.
+
+Trên Fedora/SELinux, secret bind-mount phải có nhãn `container_file_t` và chỉ
+group staging được đọc. Đặt `MCP_SECRET_GID` bằng GID sở hữu secret; không dùng
+`chmod 644`, không disable SELinux và không chạy gateway bằng root.
 
 ## Quyền Odoo tối thiểu
 
@@ -116,11 +122,27 @@ docker compose --profile test --env-file deploy/staging/.env \
   -f deploy/staging/compose.yml run --rm smoke
 docker compose --profile test --env-file deploy/staging/.env \
   -f deploy/staging/compose.yml run --rm write-smoke
+docker compose --profile test --env-file deploy/staging/.env \
+  -f deploy/staging/compose.yml run --rm keycloak-write-config
+docker compose --profile test --env-file deploy/staging/.env \
+  -f deploy/staging/compose.yml run --rm pkce-smoke
+docker compose --profile test --env-file deploy/staging/.env \
+  -f deploy/staging/compose.yml run --rm http-guard-smoke
 ```
 
 Không đánh PASS write nếu thiếu record ID thật, quotation không phải `draft`,
 rollback/concurrency không PASS, token thu hồi vẫn dùng được, hoặc audit chứa
 token/PII.
+
+Thử restore backup bằng project và volume riêng, không dùng project name của
+staging chính và không xóa volume sau test:
+
+```bash
+sh deploy/staging/run_restore_verify.sh
+```
+
+Script tạo database mới theo timestamp, kiểm số bảng/module/realm, rồi chỉ stop
+hai PostgreSQL restore. Không dùng `down -v` hoặc `--remove-orphans`.
 
 ## Kết nối client
 

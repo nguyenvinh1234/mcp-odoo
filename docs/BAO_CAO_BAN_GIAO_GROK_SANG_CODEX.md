@@ -1,5 +1,9 @@
 # Báo cáo bàn giao Grok sang Codex — Odoo MCP Ngọc Việt CNC
 
+> Phần P0 mới nhất về write gateway cô lập, OAuth PKCE, CRM write E2E, HTTP
+> guard, restore drill và scan image được ghi tại
+> `docs/BAO_CAO_CHAT_LUONG_CRM_WRITE_STAGING_2026-10-21.md`.
+
 Ngày kiểm tra: **20-10-2026**  
 Repository: `https://github.com/nguyenvinh1234/mcp-odoo`  
 PR: `https://github.com/nguyenvinh1234/mcp-odoo/pull/1`  
