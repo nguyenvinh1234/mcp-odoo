@@ -2,6 +2,10 @@
 set -eu
 
 cd "$(dirname "$0")/../.."
+RESTORE_RUN_ID="${RESTORE_RUN_ID:-$(date -u +%Y%m%dT%H%M%SZ)}"
+RESTORE_RUN_ID="$(printf '%s' "$RESTORE_RUN_ID" | tr -cd 'A-Za-z0-9_')"
+test -n "$RESTORE_RUN_ID"
+export RESTORE_RUN_ID
 
 dc() {
   docker compose \

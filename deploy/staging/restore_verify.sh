@@ -1,8 +1,15 @@
 #!/bin/sh
 set -eu
 
-ODOO_DB=ngv_restore_verify
-KEYCLOAK_DB=keycloak_restore_verify
+case "${RESTORE_RUN_ID:-}" in
+  ""|*[!A-Za-z0-9_]*)
+    echo "RESTORE_RUN_ID must contain only letters, digits, and underscores" >&2
+    exit 2
+    ;;
+esac
+
+ODOO_DB="ngv_restore_${RESTORE_RUN_ID}"
+KEYCLOAK_DB="keycloak_restore_${RESTORE_RUN_ID}"
 export PGCONNECT_TIMEOUT=5
 
 wait_for_db() {
@@ -53,5 +60,5 @@ test "$ODOO_REGISTRY" -gt 0
 test "$KEYCLOAK_TABLES" -gt 0
 test "$KEYCLOAK_REALMS" -gt 0
 
-printf '{"restore_verify":"PASS","odoo_tables":%s,"odoo_installed_modules":%s,"keycloak_tables":%s,"keycloak_realms":%s}\n' \
-  "$ODOO_TABLES" "$ODOO_REGISTRY" "$KEYCLOAK_TABLES" "$KEYCLOAK_REALMS"
+printf '{"restore_verify":"PASS","run_id":"%s","odoo_tables":%s,"odoo_installed_modules":%s,"keycloak_tables":%s,"keycloak_realms":%s}\n' \
+  "$RESTORE_RUN_ID" "$ODOO_TABLES" "$ODOO_REGISTRY" "$KEYCLOAK_TABLES" "$KEYCLOAK_REALMS"

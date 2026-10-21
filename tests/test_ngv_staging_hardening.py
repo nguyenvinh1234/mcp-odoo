@@ -57,9 +57,11 @@ def test_restore_drill_uses_dedicated_project_and_keeps_volumes():
     assert " down" not in runner
     assert "down -v" not in runner
     assert "down --volumes" not in runner
+    assert "RESTORE_RUN_ID" in runner
 
     compose = (ROOT / "deploy/staging/restore-verify.yml").read_text(
         encoding="utf-8"
     )
     assert "restore-backend: {internal: true}" in compose
     assert "ports:" not in compose
+    assert "RESTORE_RUN_ID" in compose
