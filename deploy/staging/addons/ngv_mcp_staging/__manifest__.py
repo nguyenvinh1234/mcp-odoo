@@ -1,7 +1,7 @@
 {
     "name": "Ngoc Viet MCP staging fixtures",
     "version": "16.0.2.0.0",
-    "license": "MIT",
+    "license": "Other OSI approved licence",
     "depends": ["crm", "sale_management"],
     "data": [
         "security/ngv_groups.xml",
