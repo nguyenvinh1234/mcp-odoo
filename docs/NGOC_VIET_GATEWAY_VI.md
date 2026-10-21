@@ -87,6 +87,41 @@ không mount Docker socket. Audit nằm ở volume `gateway-audit`.
 - Mỗi AI/nhân viên cần ranh giới dữ liệu khác nhau phải dùng một Odoo credential
   và một instance mapping riêng. Không dùng một service account admin chung.
 
+## Ghi có kiểm soát — chỉ staging
+
+Profile `ngocviet-staging-write` tách biệt hoàn toàn với readonly. Profile này
+chỉ được bật khi đồng thời có OAuth, scope `odoo.write.staging`, audit log,
+instance/Odoo database staging, Odoo major 16, `ODOO_MCP_ENABLE_WRITES=1` và
+ACK staging chính xác. Không bật profile này cho production.
+
+Quy trình bắt buộc gồm hai bước:
+
+1. AI gọi một tool `ngv_prepare_*`. Gateway kiểm tra ACL, duplicate, validation
+   và trạng thái hiện tại, rồi trả preview + approval token không chứa PII.
+2. Sau khi người dùng xác nhận, AI gọi `ngv_execute_approved_change` với
+   `confirm=true`. Token hết hạn sau 10 phút, dùng một lần và ràng buộc đúng
+   client/instance.
+
+Chỉ ba action được hỗ trợ: tạo customer, cập nhật lead và tạo quotation ở state
+`draft`. Không có tool xóa, xác nhận đơn, gửi email, đăng chatter, chạy method
+tùy ý hoặc đổi giá do AI cung cấp. Mọi request phải có idempotency key; retry
+và hai request đồng thời cùng key chỉ tạo một record.
+
+Chạy E2E staging:
+
+```bash
+docker compose --profile test --env-file deploy/staging/.env \
+  -f deploy/staging/compose.yml run --rm oauth-smoke
+docker compose --profile test --env-file deploy/staging/.env \
+  -f deploy/staging/compose.yml run --rm smoke
+docker compose --profile test --env-file deploy/staging/.env \
+  -f deploy/staging/compose.yml run --rm write-smoke
+```
+
+Không đánh PASS write nếu thiếu record ID thật, quotation không phải `draft`,
+rollback/concurrency không PASS, token thu hồi vẫn dùng được, hoặc audit chứa
+token/PII.
+
 ## Kết nối client
 
 ### ChatGPT qua HTTPS
