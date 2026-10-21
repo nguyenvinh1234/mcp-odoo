@@ -90,14 +90,50 @@ def main() -> None:
         scopes_response = client.get(f"{base}/client-scopes", headers=headers)
         scopes_response.raise_for_status()
         scope_ids = {row["name"]: row["id"] for row in scopes_response.json()}
+        created_scopes: list[str] = []
         for name in SCOPES:
-            scope_id = scope_ids.get(name)
-            if scope_id:
-                response = client.put(
-                    f"{base}/clients/{client_uuid}/default-client-scopes/{scope_id}",
-                    headers=headers,
-                )
-                response.raise_for_status()
+            if name == "profile" or name in scope_ids:
+                continue
+            created_scope = client.post(
+                f"{base}/client-scopes",
+                json={
+                    "name": name,
+                    "protocol": "openid-connect",
+                    "attributes": {
+                        "include.in.token.scope": "true",
+                        "display.on.consent.screen": "true",
+                    },
+                },
+                headers=headers,
+            )
+            created_scope.raise_for_status()
+            created_scopes.append(name)
+
+        if created_scopes:
+            scopes_response = client.get(f"{base}/client-scopes", headers=headers)
+            scopes_response.raise_for_status()
+            scope_ids = {row["name"]: row["id"] for row in scopes_response.json()}
+
+        missing = sorted(set(SCOPES) - set(scope_ids))
+        if missing:
+            raise RuntimeError(f"Required Keycloak client scopes are missing: {missing}")
+        for name in SCOPES:
+            response = client.put(
+                f"{base}/clients/{client_uuid}/default-client-scopes/{scope_ids[name]}",
+                headers=headers,
+            )
+            response.raise_for_status()
+
+        assigned_response = client.get(
+            f"{base}/clients/{client_uuid}/default-client-scopes", headers=headers
+        )
+        assigned_response.raise_for_status()
+        assigned = {row["name"] for row in assigned_response.json()}
+        missing_assigned = sorted(set(SCOPES) - assigned)
+        if missing_assigned:
+            raise RuntimeError(
+                f"Required scopes were not assigned to the write client: {missing_assigned}"
+            )
 
         mapper = {
             "name": "mcp-write-resource-url-audience",
@@ -139,6 +175,8 @@ def main() -> None:
                 "direct_access_grants": False,
                 "pkce": "S256",
                 "redirect_uri": REDIRECT_URI,
+                "required_scope_count": len(SCOPES),
+                "created_scopes": created_scopes,
             },
             indent=2,
         )
