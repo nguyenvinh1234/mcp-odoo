@@ -31,8 +31,14 @@ restore_once() {
   if ! psql -w -h "$host" -U "$user" -d postgres -Atc \
     "select 1 from pg_database where datname='${database}'" | grep -qx 1; then
     createdb -w -h "$host" -U "$user" "$database"
-    pg_restore -w --exit-on-error --no-owner --no-privileges \
-      -h "$host" -U "$user" -d "$database" "$dump"
+    raw_sql="/tmp/${database}.sql"
+    compatible_sql="/tmp/${database}.compatible.sql"
+    pg_restore --no-owner --no-privileges --file "$raw_sql" "$dump"
+    # pg_dump 17 emits this SET even for a PostgreSQL 15 source.  Removing
+    # exactly this session-only setting preserves a strict PG15 data restore.
+    sed '/^SET transaction_timeout = 0;$/d' "$raw_sql" >"$compatible_sql"
+    psql -w -v ON_ERROR_STOP=1 -h "$host" -U "$user" -d "$database" \
+      -f "$compatible_sql" >/dev/null
   fi
 }
 

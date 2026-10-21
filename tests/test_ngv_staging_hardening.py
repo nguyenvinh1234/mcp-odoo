@@ -65,3 +65,9 @@ def test_restore_drill_uses_dedicated_project_and_keeps_volumes():
     assert "restore-backend: {internal: true}" in compose
     assert "ports:" not in compose
     assert "RESTORE_RUN_ID" in compose
+
+    restore_script = (ROOT / "deploy/staging/restore_verify.sh").read_text(
+        encoding="utf-8"
+    )
+    assert "SET transaction_timeout = 0" in restore_script
+    assert "ON_ERROR_STOP=1" in restore_script
