@@ -151,6 +151,17 @@ class NgvHttpGuardMiddleware:
                 continue
             body.extend(message.get("body", b""))
             if len(body) > self.max_body:
+                access_token = get_access_token()
+                subject = (
+                    access_token.client_id if access_token is not None else "anonymous"
+                )
+                record_gateway_event(
+                    "ngv_http_guard",
+                    outcome="denied",
+                    client_id=None if subject == "anonymous" else subject,
+                    tool="mcp_control",
+                    error_code="request_too_large",
+                )
                 await self._json_response(
                     send, 413, -32013, "Request body exceeds the configured limit"
                 )

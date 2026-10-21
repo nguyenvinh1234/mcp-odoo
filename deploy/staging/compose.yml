@@ -274,7 +274,6 @@ services:
       MCP_ALLOWED_ORIGINS: https://${MCP_WRITE_PUBLIC_HOST}
     secrets: [odoo_config, client_policy, oauth_client_secret]
     volumes: [gateway-write-audit:/var/log/odoo-mcp]
-    ports: ["127.0.0.1:${MCP_WRITE_BIND_PORT:-8766}:8000"]
     networks: [backend]
     depends_on:
       odoo16: {condition: service_healthy}
@@ -431,6 +430,32 @@ services:
     volumes:
       - gateway-write-audit:/var/log/odoo-mcp:ro
       - ./smoke_write.py:/opt/tests/smoke_write.py:ro
+    networks: [backend]
+    depends_on:
+      gateway-write: {condition: service_healthy}
+    read_only: true
+    tmpfs: ["/tmp:size=16m,mode=1777"]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 256m
+    pids_limit: 64
+    cpus: 0.5
+    restart: "no"
+
+  http-guard-smoke:
+    image: ngv-odoo-mcp-staging:local
+    group_add: ["${MCP_SECRET_GID:-1000}"]
+    profiles: ["test"]
+    entrypoint: ["python"]
+    command: ["/opt/tests/smoke_http_guards.py"]
+    environment:
+      MCP_WRITE_TEST_URL: http://gateway-write:8000/mcp
+      MCP_AUTH_TOKEN_URL: ${MCP_AUTH_TOKEN_URL}
+    secrets:
+      - oauth_client_secret
+      - keycloak_writer_password
+    volumes:
+      - ./smoke_http_guards.py:/opt/tests/smoke_http_guards.py:ro
     networks: [backend]
     depends_on:
       gateway-write: {condition: service_healthy}

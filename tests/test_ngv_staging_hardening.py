@@ -9,7 +9,7 @@ def test_write_gateway_is_not_attached_to_shared_proxy_network():
     section = text.split("  gateway-write:\n", 1)[1].split("\n  smoke:\n", 1)[0]
     assert "networks: [backend]" in section
     assert "proxy:" not in section
-    assert '127.0.0.1:${MCP_WRITE_BIND_PORT:-8766}:8000' in section
+    assert "ports:" not in section
     assert "gateway-write-audit:/var/log/odoo-mcp" in section
 
 
@@ -27,6 +27,16 @@ def test_write_gateway_has_p0_http_guard_settings():
         "ODOO_MCP_AUDIT_BACKUP_COUNT",
     ):
         assert name in section
+
+
+def test_http_guard_smoke_covers_body_and_rate_limits():
+    text = (ROOT / "deploy/staging/compose.yml").read_text(encoding="utf-8")
+    assert "  http-guard-smoke:" in text
+    smoke = (ROOT / "deploy/staging/smoke_http_guards.py").read_text(
+        encoding="utf-8"
+    )
+    assert "413" in smoke
+    assert "429" in smoke
 
 
 def test_pkce_client_is_public_s256_without_password_grant():
