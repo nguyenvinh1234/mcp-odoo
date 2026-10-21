@@ -156,15 +156,15 @@ class NgvMcpRequest(models.Model):
             "model": record._name,
             "record_id": record.id,
             "replayed": False,
-            "state": record.state if "state" in record._fields else None,
+            "state": record.state if "state" in record._fields else False,
         }
 
     @api.model
     def _safe_state(self, model_name, record_id):
         if model_name not in {"res.partner", "crm.lead", "sale.order"}:
-            return None
+            return False
         record = self.env[model_name].browse(record_id).exists()
-        return record.state if record and "state" in record._fields else None
+        return record.state if record and "state" in record._fields else False
 
     @api.model
     def _create_customer(self, payload):
